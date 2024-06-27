@@ -159,7 +159,7 @@ export default function App() {
 
   return (
     <div className="App">
-      <h1>Update Item Form</h1>
+      <h1>Update Item Form Test</h1>
       <h2>This is a test to update items on the sheet</h2>
       <div>
         {!isCheckoutMode ? (
