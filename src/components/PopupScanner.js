@@ -21,8 +21,10 @@ export default function PopupScanner({ isOpen, onClose, onDetected }) {
     }
 
     return () => {
+      if (isOpen) {
+        Quagga.stop();
+      }
       Quagga.offDetected(handleDetected);
-      Quagga.stop();
       if (Quagga.CameraAccess) {
         Quagga.CameraAccess.release();
       }

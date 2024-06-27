@@ -1,4 +1,3 @@
-// src/components/ViewPage.js
 import React, { useState, useEffect } from 'react';
 import Quagga from '@ericblade/quagga2';
 import {
@@ -28,7 +27,6 @@ export default function ViewPage() {
 
   useEffect(() => {
     fetchDropdownData();
-
     return () => {
       Quagga.offDetected(onDetected); // Remove event listener
       Quagga.stop(); // Stop the scanner
@@ -75,12 +73,35 @@ export default function ViewPage() {
     }
   };
 
-  const handleChange = (e) => {
+  const handleChange = async (e) => {
     const { name, value } = e.target;
     setFormData((prevFormData) => ({
       ...prevFormData,
       [name]: value
     }));
+
+    if (name === 'ID' && value) {
+      await fetchDataForID(value);
+    }
+  };
+
+  const fetchDataForID = async (id) => {
+    try {
+      const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv/search?ID=${id}&sheet=Inventory`);
+      const data = await response.json();
+      if (data.length > 0) {
+        const item = data[0];
+        setFormData((prevFormData) => ({
+          ...prevFormData,
+          Campus: item.Campus,
+          Department: item.Department,
+          Room: item.Room,
+          ShelfContainer: item.ShelfContainer
+        }));
+      }
+    } catch (error) {
+      console.error(`Error fetching data for ID ${id}:`, error);
+    }
   };
 
   const onDetected = (data) => {
@@ -93,6 +114,8 @@ export default function ViewPage() {
       ...prevFormData,
       ID: code
     }));
+
+    fetchDataForID(code);
   };
 
   const startScanner = () => {
