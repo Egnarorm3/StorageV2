@@ -6,8 +6,8 @@ import {
   FormControl,
   FormLabel,
   Select,
-  Input,
-  Heading
+  Heading,
+  Image
 } from '@chakra-ui/react';
 
 export default function ViewPage() {
@@ -16,7 +16,8 @@ export default function ViewPage() {
     Campus: "",
     Department: "",
     Room: "",
-    ShelfContainer: ""
+    ShelfContainer: "",
+    ImageURL: "" // Add ImageURL to formData
   });
   const [flash, setFlash] = useState(false);
   const [ids, setIds] = useState([]);
@@ -96,7 +97,8 @@ export default function ViewPage() {
           Campus: item.Campus,
           Department: item.Department,
           Room: item.Room,
-          ShelfContainer: item.ShelfContainer
+          ShelfContainer: item.ShelfContainer,
+          ImageURL: item.ImageURL // Set the ImageURL from the fetched data
         }));
       }
     } catch (error) {
@@ -255,6 +257,11 @@ export default function ViewPage() {
             {renderOptions(shelfContainerOptions)}
           </Select>
         </FormControl>
+        {formData.ImageURL && (
+           <Box mt={4} maxWidth="500px" maxHeight="500px">
+            <Image src={formData.ImageURL} alt="Item Image" />
+          </Box>
+        )}
         <Button type="submit" colorScheme="teal" mt={4}>Submit</Button>
       </Box>
     </Box>
