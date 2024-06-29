@@ -100,6 +100,7 @@ export default function ViewPage() {
           ShelfContainer: item.ShelfContainer,
           ImageURL: item.ImageURL // Set the ImageURL from the fetched data
         }));
+        console.log(`Image URL: ${item.ImageURL}`); // Log the image URL
       }
     } catch (error) {
       console.error(`Error fetching data for ID ${id}:`, error);
@@ -258,7 +259,7 @@ export default function ViewPage() {
           </Select>
         </FormControl>
         {formData.ImageURL && (
-           <Box mt={4} maxWidth="500px" maxHeight="500px">
+          <Box mt={4} maxWidth="500px" maxHeight="500px">
             <Image src={formData.ImageURL} alt="Item Image" />
           </Box>
         )}
