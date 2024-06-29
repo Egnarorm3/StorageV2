@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Quagga from '@ericblade/quagga2';
 import {
   Box,
@@ -8,7 +8,8 @@ import {
   Select,
   UnorderedList,
   ListItem,
-  Heading
+  Heading,
+  Input
 } from '@chakra-ui/react';
 
 export default function MovePage() {
@@ -25,6 +26,9 @@ export default function MovePage() {
   const [campuses, setCampuses] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [useBarcodeScanner, setUseBarcodeScanner] = useState(false);
+  const barcodeBuffer = useRef("");
+  const scanTimeout = useRef(null);
 
   useEffect(() => {
     fetchDropdownData();
@@ -98,6 +102,27 @@ export default function MovePage() {
     });
   };
 
+  const handleBarcodeScan = (e) => {
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+    }
+
+    barcodeBuffer.current += e.target.value;
+    e.target.value = "";
+
+    scanTimeout.current = setTimeout(() => {
+      if (barcodeBuffer.current.length > 0) {
+        const code = barcodeBuffer.current;
+        barcodeBuffer.current = "";
+        setScannedIds((prevIds) => {
+          const newIds = !prevIds.includes(code) ? [...prevIds, code] : prevIds;
+          console.log(`Scanned IDs after barcode scan: ${JSON.stringify(newIds)}`);
+          return newIds;
+        });
+      }
+    }, 300); // Adjust the timeout as needed
+  };
+
   const startScanner = () => {
     Quagga.init({
       inputStream: {
@@ -129,7 +154,11 @@ export default function MovePage() {
   };
 
   const removeScannedId = (idToRemove) => {
-    setScannedIds((prevIds) => prevIds.filter((id) => id !== idToRemove));
+    setScannedIds((prevIds) => {
+      const newIds = prevIds.filter((id) => id !== idToRemove);
+      console.log(`Scanned IDs after removal: ${JSON.stringify(newIds)}`);
+      return newIds;
+    });
   };
 
   const handleSubmit = (e) => {
@@ -149,7 +178,12 @@ export default function MovePage() {
       Date: currentDate
     }));
 
-    console.log("Data to send:", dataToSend);
+    console.log("Data to send:", JSON.stringify(dataToSend, null, 2));
+
+    if (dataToSend.length === 0) {
+      console.log("No data to send.");
+      return;
+    }
 
     // Add a new line in the Update sheet
     try {
@@ -196,6 +230,7 @@ export default function MovePage() {
     }
 
     // Reset scanned IDs
+    console.log('Resetting scanned IDs');
     setScannedIds([]);
   };
 
@@ -208,7 +243,10 @@ export default function MovePage() {
   return (
     <Box className="MovePage" textAlign="center">
       <Heading>Move Items</Heading>
-      <Box as="form" className="form" onSubmit={handleSubmit}>
+      <Button onClick={() => setUseBarcodeScanner(!useBarcodeScanner)}>
+        {useBarcodeScanner ? "Use Camera Scanner" : "Use Barcode Scanner"}
+      </Button>
+      <Box className="form">
         <FormControl>
           <FormLabel>Campus</FormLabel>
           <Select name="Campus" value={formData.Campus} onChange={handleChange}>
@@ -237,8 +275,21 @@ export default function MovePage() {
             {renderOptions(shelfContainerOptions)}
           </Select>
         </FormControl>
-        <Button colorScheme="teal" mt={4} onClick={startScanner}>Start Scanning</Button>
-        <Box id="interactive" className={`viewport ${flash ? "flash" : ""}`} mt={4} />
+        {useBarcodeScanner && (
+          <Input
+            type="text"
+            autoFocus
+            value=""
+            onChange={handleBarcodeScan}
+            style={{ position: 'absolute', left: '-9999px' }}
+          />
+        )}
+        {!useBarcodeScanner && (
+          <>
+            <Button colorScheme="teal" mt={4} onClick={startScanner}>Start Scanning</Button>
+            <Box id="interactive" className={`viewport ${flash ? "flash" : ""}`} mt={4} />
+          </>
+        )}
         <Heading size="md" mt={4}>Scanned IDs:</Heading>
         <UnorderedList>
           {scannedIds.map((id, index) => (
@@ -247,7 +298,7 @@ export default function MovePage() {
             </ListItem>
           ))}
         </UnorderedList>
-        <Button type="submit" colorScheme="teal" mt={4}>Submit All</Button>
+        <Button colorScheme="teal" mt={4} onClick={handleSubmit}>Submit All</Button>
       </Box>
     </Box>
   );
