@@ -6,11 +6,12 @@ import {
   FormControl,
   FormLabel,
   Select,
-  UnorderedList,
+  OrderedList,
   ListItem,
   Heading,
   Input
 } from '@chakra-ui/react';
+
 
 export default function MovePage() {
   const [scannedIds, setScannedIds] = useState([]);
@@ -96,7 +97,7 @@ export default function MovePage() {
     setScannedIds((prevIds) => {
       if (!prevIds.includes(code)) {
         console.log(`Adding ${code} to scanned IDs`);
-        return [...prevIds, code];
+        return [code,...prevIds];
       }
       return prevIds;
     });
@@ -291,13 +292,17 @@ export default function MovePage() {
           </>
         )}
         <Heading size="md" mt={4}>Scanned IDs:</Heading>
-        <UnorderedList>
-          {scannedIds.map((id, index) => (
-            <ListItem key={index}>
-              {id} <Button size="xs" colorScheme="red" onClick={() => removeScannedId(id)}>X</Button>
-            </ListItem>
-          ))}
-        </UnorderedList>
+
+
+<OrderedList reversed style={{ listStyleType: 'decimal', counterReset: 'list 0' }}>
+  {scannedIds.map((id, index) => (
+    <ListItem key={index} style={{ direction: 'ltr', counterIncrement: 'list -1', display: 'flex', alignItems: 'center' }}>
+      <span style={{ marginRight: '8px' }}>{scannedIds.length - index}.</span>
+      {id} <Button size="xs" colorScheme="red" onClick={() => removeScannedId(id)}>X</Button>
+    </ListItem>
+  ))}
+</OrderedList>
+
         <Button colorScheme="teal" mt={4} onClick={handleSubmit}>Submit All</Button>
       </Box>
     </Box>

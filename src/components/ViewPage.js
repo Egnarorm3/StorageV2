@@ -92,20 +92,39 @@ export default function ViewPage() {
       const data = await response.json();
       if (data.length > 0) {
         const item = data[0];
-        setFormData((prevFormData) => ({
-          ...prevFormData,
-          Campus: item.Campus,
-          Department: item.Department,
-          Room: item.Room,
-          ShelfContainer: item.ShelfContainer,
-          ImageURL: item.ImageURL // Set the ImageURL from the fetched data
-        }));
-        console.log(`Image URL: ${item.ImageURL}`); // Log the image URL
+        const imageUrl = item.ImageURL
+        const formattedUrl = imageUrl
+        convertToBase64(formattedUrl, (base64Img) => {
+          setFormData((prevFormData) => ({
+            ...prevFormData,
+            Campus: item.Campus,
+            Department: item.Department,
+            Room: item.Room,
+            ShelfContainer: item.ShelfContainer,
+            ImageURL: base64Img // Set the Base64 ImageURL
+          }));
+        });
+        console.log(`Image URL: ${formattedUrl}`); // Log the image URL
       }
     } catch (error) {
       console.error(`Error fetching data for ID ${id}:`, error);
     }
   };
+  
+  const convertToBase64 = (url, callback) => {
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function() {
+      var reader = new FileReader();
+      reader.onloadend = function() {
+        callback(reader.result);
+      };
+      reader.readAsDataURL(xhr.response);
+    };
+    xhr.open('GET', url);
+    xhr.responseType = 'blob';
+    xhr.send();
+  };
+  
 
   const onDetected = (data) => {
     const code = data.codeResult.code;
@@ -261,10 +280,11 @@ export default function ViewPage() {
           </Select>
         </FormControl>
         {formData.ImageURL && (
-          <Box mt={4} maxWidth="500px" maxHeight="500px">
-            <Image src={formData.ImageURL} alt="Item Image" />
-          </Box>
-        )}
+  <Box mt={4} maxWidth="500px" maxHeight="500px">
+    <Image src={formData.ImageURL} alt="Item Image" />
+  </Box>
+)}
+
         <Button type="submit" colorScheme="teal" mt={4}>Submit</Button>
       </Box>
     </Box>
