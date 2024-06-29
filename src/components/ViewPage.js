@@ -165,7 +165,8 @@ export default function ViewPage() {
       Department: data.Department,
       Room: data.Room,
       ShelfContainer: data.ShelfContainer,
-      Date: currentDate
+      Date: currentDate,
+      ImageURL: data.ImageURL // Ensure ImageURL is included
     };
 
     // Add a new line in the Update sheet
@@ -200,7 +201,8 @@ export default function ViewPage() {
             Department: dataToSend.Department,
             Room: dataToSend.Room,
             ShelfContainer: dataToSend.ShelfContainer,
-            "Last updated": currentDate
+            "Last updated": currentDate,
+            ImageURL: dataToSend.ImageURL // Ensure ImageURL is included
           })
         }
       );
