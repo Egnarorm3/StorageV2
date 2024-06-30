@@ -28,6 +28,8 @@ export default function MovePage() {
   const [departments, setDepartments] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [useBarcodeScanner, setUseBarcodeScanner] = useState(false);
+  const [useManualInput, setUseManualInput] = useState(false);
+  const [manualCode, setManualCode] = useState("");
   const barcodeBuffer = useRef("");
   const scanTimeout = useRef(null);
 
@@ -89,7 +91,7 @@ export default function MovePage() {
   };
 
   const onDetected = (data) => {
-    const code = data.codeResult.code;
+    const code = data.codeResult.code.toUpperCase();
     console.log("Detected code:", code);
     setFlash(true);
     setTimeout(() => setFlash(false), 100);
@@ -97,7 +99,7 @@ export default function MovePage() {
     setScannedIds((prevIds) => {
       if (!prevIds.includes(code)) {
         console.log(`Adding ${code} to scanned IDs`);
-        return [code,...prevIds];
+        return [code, ...prevIds];
       }
       return prevIds;
     });
@@ -113,15 +115,29 @@ export default function MovePage() {
 
     scanTimeout.current = setTimeout(() => {
       if (barcodeBuffer.current.length > 0) {
-        const code = barcodeBuffer.current;
+        const code = barcodeBuffer.current.toUpperCase();
         barcodeBuffer.current = "";
         setScannedIds((prevIds) => {
-          const newIds = !prevIds.includes(code) ? [...prevIds, code] : prevIds;
+          const newIds = !prevIds.includes(code) ? [code, ...prevIds] : prevIds;
           console.log(`Scanned IDs after barcode scan: ${JSON.stringify(newIds)}`);
           return newIds;
         });
       }
     }, 300); // Adjust the timeout as needed
+  };
+
+  const handleManualSubmit = () => {
+    const code = manualCode.toUpperCase();
+    if (!ids.includes(code)) {
+      alert("Invalid ID. Please enter a valid ID.");
+      return;
+    }
+    setScannedIds((prevIds) => {
+      const newIds = !prevIds.includes(code) ? [code, ...prevIds] : prevIds;
+      console.log(`Scanned IDs after manual input: ${JSON.stringify(newIds)}`);
+      return newIds;
+    });
+    setManualCode(""); // Clear the input field
   };
 
   const startScanner = () => {
@@ -244,8 +260,14 @@ export default function MovePage() {
   return (
     <Box className="MovePage" textAlign="center">
       <Heading>Move Items</Heading>
-      <Button onClick={() => setUseBarcodeScanner(!useBarcodeScanner)}>
-        {useBarcodeScanner ? "Use Camera Scanner" : "Use Barcode Scanner"}
+      <Button onClick={() => { setUseBarcodeScanner(false); setUseManualInput(false); }}>
+        Use Camera Scanner
+      </Button>
+      <Button onClick={() => { setUseBarcodeScanner(true); setUseManualInput(false); }}>
+        Use Barcode Scanner
+      </Button>
+      <Button onClick={() => { setUseManualInput(true); setUseBarcodeScanner(false); }}>
+        Use Manual Input
       </Button>
       <Box className="form">
         <FormControl>
@@ -285,7 +307,18 @@ export default function MovePage() {
             style={{ position: 'absolute', left: '-9999px' }}
           />
         )}
-        {!useBarcodeScanner && (
+        {useManualInput && (
+          <Box>
+            <Input
+              type="text"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="Enter code manually"
+            />
+            <Button onClick={handleManualSubmit} mt={2}>Add Code</Button>
+          </Box>
+        )}
+        {!useBarcodeScanner && !useManualInput && (
           <>
             <Button colorScheme="teal" mt={4} onClick={startScanner}>Start Scanning</Button>
             <Box id="interactive" className={`viewport ${flash ? "flash" : ""}`} mt={4} />

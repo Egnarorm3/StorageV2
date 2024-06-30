@@ -7,7 +7,12 @@ import {
   FormLabel,
   Select,
   Heading,
-  Image
+  Image,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalBody,
+  ModalCloseButton
 } from '@chakra-ui/react';
 
 export default function ViewPage() {
@@ -17,7 +22,9 @@ export default function ViewPage() {
     Department: "",
     Room: "",
     ShelfContainer: "",
-    ImageURL: "" // Add ImageURL to formData
+    ImageURL: "",
+    Description: "",
+    containsItems: []
   });
   const [flash, setFlash] = useState(false);
   const [ids, setIds] = useState([]);
@@ -25,14 +32,18 @@ export default function ViewPage() {
   const [campuses, setCampuses] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [insidersSet, setInsidersSet] = useState(new Set());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState("");
+  const [previousID, setPreviousID] = useState(null);
 
   useEffect(() => {
     fetchDropdownData();
     return () => {
-      Quagga.offDetected(onDetected); // Remove event listener
-      Quagga.stop(); // Stop the scanner
+      Quagga.offDetected(onDetected);
+      Quagga.stop();
       if (Quagga.cameraAccess) {
-        Quagga.CameraAccess.release(); // Release the camera access
+        Quagga.CameraAccess.release();
       }
     };
   }, []);
@@ -69,6 +80,7 @@ export default function ViewPage() {
       setDepartments(Array.from(departmentsSet));
       setRooms(Array.from(roomsSet));
       setShelfContainerOptions(Array.from(shelfContainerOptionsSet));
+      setInsidersSet(insidersSet);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
     }
@@ -82,6 +94,7 @@ export default function ViewPage() {
     }));
 
     if (name === 'ID' && value) {
+      setPreviousID(null); // Clear previous ID if manually changing ID
       await fetchDataForID(value);
     }
   };
@@ -92,13 +105,21 @@ export default function ViewPage() {
       const data = await response.json();
       if (data.length > 0) {
         const item = data[0];
+        const containsItems = [];
+        if (insidersSet.has(item.Item)) {
+          const responseContains = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv/search?ShelfContainer=${id}&sheet=Inventory`);
+          const dataContains = await responseContains.json();
+          containsItems.push(...dataContains);
+        }
         setFormData((prevFormData) => ({
           ...prevFormData,
           Campus: item.Campus,
           Department: item.Department,
           Room: item.Room,
           ShelfContainer: item.ShelfContainer,
-          ImageURL: item.ImageURL // Set the ImageURL from the fetched data
+          ImageURL: item.ImageURL || "No Image",
+          Description: item.Description || "No Description",
+          containsItems
         }));
       }
     } catch (error) {
@@ -125,7 +146,7 @@ export default function ViewPage() {
       inputStream: {
         type: "LiveStream",
         constraints: {
-          facingMode: "environment" // Use the rear camera
+          facingMode: "environment"
         },
         area: {
           top: "0%",
@@ -133,7 +154,7 @@ export default function ViewPage() {
           left: "0%",
           bottom: "0%"
         },
-        target: document.querySelector('#interactive'), // Add this to attach the video stream
+        target: document.querySelector('#interactive'),
         singleChannel: false
       },
       decoder: {
@@ -156,7 +177,7 @@ export default function ViewPage() {
   };
 
   const submitFormData = async (data) => {
-    const currentDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+    const currentDate = new Date().toISOString().split('T')[0];
 
     const dataToSend = {
       ID: data.ID,
@@ -167,7 +188,6 @@ export default function ViewPage() {
       Date: currentDate
     };
 
-    // Add a new line in the Update sheet
     try {
       const response = await fetch(
         "https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=Update",
@@ -185,7 +205,6 @@ export default function ViewPage() {
       console.error("Error updating the Update sheet:", error);
     }
 
-    // Update the specific row in the Inventory sheet based on the ID
     try {
       const response = await fetch(
         `https://sheetdb.io/api/v1/26ca60uj6plvv/ID/${dataToSend.ID}?sheet=Inventory`,
@@ -216,9 +235,52 @@ export default function ViewPage() {
     ));
   };
 
+  const openModal = (imageUrl) => {
+    setSelectedImage(imageUrl);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedImage("");
+  };
+
+  const handleItemClick = (id) => {
+    setPreviousID(formData.ID); // Save the current ID before changing
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      ID: id
+    }));
+    fetchDataForID(id);
+  };
+
+  const handleBackClick = () => {
+    if (previousID) {
+      setFormData((prevFormData) => ({
+        ...prevFormData,
+        ID: previousID
+      }));
+      fetchDataForID(previousID);
+      setPreviousID(null);
+    }
+  };
+
   return (
     <Box className="ViewPage" textAlign="center">
       <Heading>View Item</Heading>
+      {previousID && (
+        <Button
+          colorScheme="teal"
+          position="fixed"
+          top="10px"
+          left="10px"
+          zIndex="1000"
+          boxShadow="md"
+          onClick={handleBackClick}
+        >
+          Back to {previousID}
+        </Button>
+      )}
       <Box as="form" className="form" onSubmit={handleSubmit}>
         <FormControl>
           <FormLabel>ID</FormLabel>
@@ -258,12 +320,60 @@ export default function ViewPage() {
           </Select>
         </FormControl>
         {formData.ImageURL && (
-          <Box mt={4} maxWidth="500px" maxHeight="500px">
-            <Image src={formData.ImageURL} alt="Item Image" boxSize="100%" objectFit="contain" />
+          <Box mt={4} maxWidth="500px" maxHeight="500px" borderWidth="1px" borderRadius="lg" overflow="hidden" display="flex" alignItems="center" justifyContent="center">
+            {formData.ImageURL === "No Image" ? (
+              <Box width="100%" height="100%" display="flex" alignItems="center" justifyContent="center">
+                No Image
+              </Box>
+            ) : (
+              <Image src={formData.ImageURL} alt="Item Image" boxSize="100%" objectFit="contain" onClick={() => openModal(formData.ImageURL)} cursor="pointer" />
+            )}
+          </Box>
+        )}
+        <Box mt={2} p={4} borderWidth="1px" borderRadius="lg" width="500px">
+          <Heading size="sm">Description:</Heading>
+          <p>{formData.Description || "No Description"}</p>
+        </Box>
+        {formData.containsItems.length > 0 && (
+          <Box mt={4} p={4} borderWidth="1px" borderRadius="lg" width="100%">
+            <Heading size="md">Contains:</Heading>
+            <Box display="flex" flexWrap="wrap" justifyContent="center">
+              {formData.containsItems.map((item, index) => (
+                <Box key={index} m={2} p={2} borderWidth="1px" borderRadius="lg" width="45%" display="flex" flexDirection="column" alignItems="center" onClick={() => handleItemClick(item.ID)} cursor="pointer">
+                  <Heading size="sm">ID: {item.ID}</Heading>
+                  <Box mt={1}><strong>Item:</strong> {item.Item}</Box>
+                  <Box mt={2} maxWidth="200px" maxHeight="200px" borderWidth="1px" borderRadius="lg" overflow="hidden" display="flex" alignItems="center" justifyContent="center">
+                    {item.ImageURL === "No Image" ? (
+                      <Box width="100%" height="100%" display="flex" alignItems="center" justifyContent="center">
+                        No Image
+                      </Box>
+                    ) : (
+                      <Image src={item.ImageURL} alt="Item Image" boxSize="100%" objectFit="contain" onClick={(e) => { e.stopPropagation(); openModal(item.ImageURL); }} cursor="pointer" />
+                    )}
+                  </Box>
+                  <Box mt={2}>
+                    <Heading size="sm">Description:</Heading>
+                    <p>{item.Description || "No Description"}</p>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
           </Box>
         )}
         <Button type="submit" colorScheme="teal" mt={4}>Submit</Button>
       </Box>
+
+      <Modal isOpen={isModalOpen} onClose={closeModal} size="full">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalCloseButton />
+          <ModalBody display="flex" justifyContent="center" alignItems="center">
+            <Box width="40%" height="40%" display="flex" justifyContent="center" alignItems="center" position="relative">
+              <Image src={selectedImage} alt="Full Screen Image" width="100%" height="100%" objectFit="contain" />
+            </Box>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 }

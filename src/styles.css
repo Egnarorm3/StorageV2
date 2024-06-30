@@ -1,3 +1,5 @@
+/* Styles.css */
+
 .App {
   text-align: center;
 }
@@ -52,4 +54,64 @@
   to {
     background-color: rgba(255, 255, 255, 0);
   }
+}
+
+#full-screen-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 40%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 9999;
+  transition: opacity 0.3s ease-in-out;
+}
+
+#full-screen-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+#close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: white;
+  border: none;
+  color: black;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 16px;
+  z-index: 10000;
+}
+
+button:hover,
+button:focus {
+  background-color: lightgray;
+}
+
+button:active {
+  background-color: darkgray;
+}
+
+/* Back button styling */
+#back-button {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background-color: teal;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 10000;
+}
+
+#back-button:hover {
+  background-color: darkcyan;
 }
