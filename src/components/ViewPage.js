@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import Quagga from '@ericblade/quagga2';
 import {
   Box,
@@ -8,12 +8,13 @@ import {
   Select,
   Heading,
   Image,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalBody,
-  ModalCloseButton
+  Text,
+  SimpleGrid,
+  VStack,
+  CloseButton
 } from '@chakra-ui/react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { GridHighlightContext } from '../App';
 
 export default function ViewPage() {
   const [formData, setFormData] = useState({
@@ -23,8 +24,7 @@ export default function ViewPage() {
     Room: "",
     ShelfContainer: "",
     ImageURL: "",
-    Description: "",
-    containsItems: []
+    Description: ""
   });
   const [flash, setFlash] = useState(false);
   const [ids, setIds] = useState([]);
@@ -32,21 +32,25 @@ export default function ViewPage() {
   const [campuses, setCampuses] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [rooms, setRooms] = useState([]);
-  const [insidersSet, setInsidersSet] = useState(new Set());
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedImage, setSelectedImage] = useState("");
-  const [previousID, setPreviousID] = useState(null);
+  const [containsItems, setContainsItems] = useState([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [itemExistsInGrid, setItemExistsInGrid] = useState(false);
+  const [highlightID, setHighlightID] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { setHighlightItem } = useContext(GridHighlightContext);
+  const prevID = useRef(null);
 
   useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const id = query.get('id');
+    if (id) {
+      setFormData(prevFormData => ({ ...prevFormData, ID: id }));
+      fetchDataForID(id);
+    }
     fetchDropdownData();
-    return () => {
-      Quagga.offDetected(onDetected);
-      Quagga.stop();
-      if (Quagga.cameraAccess) {
-        Quagga.CameraAccess.release();
-      }
-    };
-  }, []);
+  }, [location]);
 
   const fetchDropdownData = async () => {
     try {
@@ -80,7 +84,6 @@ export default function ViewPage() {
       setDepartments(Array.from(departmentsSet));
       setRooms(Array.from(roomsSet));
       setShelfContainerOptions(Array.from(shelfContainerOptionsSet));
-      setInsidersSet(insidersSet);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
     }
@@ -94,7 +97,6 @@ export default function ViewPage() {
     }));
 
     if (name === 'ID' && value) {
-      setPreviousID(null); // Clear previous ID if manually changing ID
       await fetchDataForID(value);
     }
   };
@@ -105,25 +107,60 @@ export default function ViewPage() {
       const data = await response.json();
       if (data.length > 0) {
         const item = data[0];
-        const containsItems = [];
-        if (insidersSet.has(item.Item)) {
-          const responseContains = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv/search?ShelfContainer=${id}&sheet=Inventory`);
-          const dataContains = await responseContains.json();
-          containsItems.push(...dataContains);
-        }
         setFormData((prevFormData) => ({
           ...prevFormData,
           Campus: item.Campus,
           Department: item.Department,
           Room: item.Room,
           ShelfContainer: item.ShelfContainer,
-          ImageURL: item.ImageURL || "No Image",
-          Description: item.Description || "No Description",
-          containsItems
+          ImageURL: item.ImageURL || "No Image", // Set the ImageURL from the fetched data
+          Description: item.Description || "No Description"
         }));
+        fetchContainsItems(item.ID);
+        checkItemInGrid(item);
       }
     } catch (error) {
       console.error(`Error fetching data for ID ${id}:`, error);
+    }
+  };
+
+  const fetchContainsItems = async (shelfContainerID) => {
+    try {
+      const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv/search?ShelfContainer=${shelfContainerID}&sheet=Inventory`);
+      const data = await response.json();
+      setContainsItems(data);
+    } catch (error) {
+      console.error(`Error fetching contains items for ShelfContainer ${shelfContainerID}:`, error);
+    }
+  };
+
+  const checkItemInGrid = async (item) => {
+    try {
+      const response1 = await fetch("https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=room1");
+      const data1 = await response1.json();
+
+      const response2 = await fetch("https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=room2");
+      const data2 = await response2.json();
+
+      const response3 = await fetch("https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=room3");
+      const data3 = await response3.json();
+
+      const gridData = [...data1, ...data2, ...data3];
+      const itemInGrid = gridData.some(row => Object.values(row).some(cell => cell.includes(item.ID)));
+      const shelfContainerInGrid = item.ShelfContainer ? gridData.some(row => Object.values(row).some(cell => cell.includes(item.ShelfContainer))) : false;
+
+      if (itemInGrid) {
+        setItemExistsInGrid(true);
+        setHighlightID(item.ID);
+      } else if (shelfContainerInGrid) {
+        setItemExistsInGrid(true);
+        setHighlightID(item.ShelfContainer);
+      } else {
+        setItemExistsInGrid(false);
+        setHighlightID(null);
+      }
+    } catch (error) {
+      console.error("Error checking item in grid:", error);
     }
   };
 
@@ -146,7 +183,7 @@ export default function ViewPage() {
       inputStream: {
         type: "LiveStream",
         constraints: {
-          facingMode: "environment"
+          facingMode: "environment" // Use the rear camera
         },
         area: {
           top: "0%",
@@ -154,7 +191,7 @@ export default function ViewPage() {
           left: "0%",
           bottom: "0%"
         },
-        target: document.querySelector('#interactive'),
+        target: document.querySelector('#interactive'), // Add this to attach the video stream
         singleChannel: false
       },
       decoder: {
@@ -177,7 +214,7 @@ export default function ViewPage() {
   };
 
   const submitFormData = async (data) => {
-    const currentDate = new Date().toISOString().split('T')[0];
+    const currentDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
 
     const dataToSend = {
       ID: data.ID,
@@ -188,6 +225,7 @@ export default function ViewPage() {
       Date: currentDate
     };
 
+    // Add a new line in the Update sheet
     try {
       const response = await fetch(
         "https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=Update",
@@ -205,6 +243,7 @@ export default function ViewPage() {
       console.error("Error updating the Update sheet:", error);
     }
 
+    // Update the specific row in the Inventory sheet based on the ID
     try {
       const response = await fetch(
         `https://sheetdb.io/api/v1/26ca60uj6plvv/ID/${dataToSend.ID}?sheet=Inventory`,
@@ -214,11 +253,8 @@ export default function ViewPage() {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            Campus: dataToSend.Campus,
-            Department: dataToSend.Department,
-            Room: dataToSend.Room,
-            ShelfContainer: dataToSend.ShelfContainer,
-            "Last updated": currentDate
+            GridLocation: dataToSend.GridLocation,
+            "Last updated": dataToSend.Date
           })
         }
       );
@@ -235,52 +271,73 @@ export default function ViewPage() {
     ));
   };
 
-  const openModal = (imageUrl) => {
-    setSelectedImage(imageUrl);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedImage("");
-  };
-
   const handleItemClick = (id) => {
-    setPreviousID(formData.ID); // Save the current ID before changing
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      ID: id
-    }));
+    prevID.current = formData.ID;
+    setFormData({ ...formData, ID: id });
     fetchDataForID(id);
   };
 
-  const handleBackClick = () => {
-    if (previousID) {
-      setFormData((prevFormData) => ({
-        ...prevFormData,
-        ID: previousID
-      }));
-      fetchDataForID(previousID);
-      setPreviousID(null);
+  const handleImageClick = (url) => {
+    setFullscreenImage(url);
+    setIsFullscreen(true);
+  };
+
+  const closeFullscreen = () => {
+    setIsFullscreen(false);
+    setFullscreenImage(null);
+  };
+
+  const handleShowInGrid = () => {
+    if (highlightID) {
+      setHighlightItem(highlightID);
+      navigate('/grid');
+    } else {
+      alert("Item not found in grid");
     }
   };
 
   return (
     <Box className="ViewPage" textAlign="center">
-      <Heading>View Item</Heading>
-      {previousID && (
+      {isFullscreen && (
+        <Box
+          position="fixed"
+          top="0"
+          left="0"
+          width="100vw"
+          height="100vh"
+          bg="rgba(0, 0, 0, 0.8)"
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          zIndex="1000"
+        >
+          <Image src={fullscreenImage} alt="Fullscreen Item Image" maxH="90%" maxW="90%" objectFit="contain" />
+          <CloseButton
+            position="absolute"
+            top="20px"
+            right="20px"
+            color="white"
+            size="lg"
+            onClick={closeFullscreen}
+          />
+        </Box>
+      )}
+      {prevID.current && (
         <Button
-          colorScheme="teal"
           position="fixed"
           top="10px"
           left="10px"
-          zIndex="1000"
+          zIndex="10"
+          onClick={() => {
+            handleItemClick(prevID.current);
+            prevID.current = null;
+          }}
           boxShadow="md"
-          onClick={handleBackClick}
         >
-          Back to {previousID}
+          Back to {prevID.current}
         </Button>
       )}
+      <Heading>View Item</Heading>
       <Box as="form" className="form" onSubmit={handleSubmit}>
         <FormControl>
           <FormLabel>ID</FormLabel>
@@ -289,7 +346,7 @@ export default function ViewPage() {
             {renderOptions(ids)}
           </Select>
         </FormControl>
-        <Button colorScheme="teal" mt={4} onClick={startScanner}>Scan Barcode</Button>
+        <Button colorScheme="teal" mt={4} onClick={startScanner}>Start Scanning</Button>
         <Box id="interactive" className={`viewport ${flash ? "flash" : ""}`} mt={4} />
         <FormControl>
           <FormLabel>Campus</FormLabel>
@@ -319,61 +376,45 @@ export default function ViewPage() {
             {renderOptions(shelfContainerOptions)}
           </Select>
         </FormControl>
-        {formData.ImageURL && (
-          <Box mt={4} maxWidth="500px" maxHeight="500px" borderWidth="1px" borderRadius="lg" overflow="hidden" display="flex" alignItems="center" justifyContent="center">
-            {formData.ImageURL === "No Image" ? (
-              <Box width="100%" height="100%" display="flex" alignItems="center" justifyContent="center">
-                No Image
-              </Box>
-            ) : (
-              <Image src={formData.ImageURL} alt="Item Image" boxSize="100%" objectFit="contain" onClick={() => openModal(formData.ImageURL)} cursor="pointer" />
-            )}
+        {formData.ImageURL !== "No Image" ? (
+          <Box mt={4} maxWidth="500px" maxHeight="500px" onClick={() => handleImageClick(formData.ImageURL)}>
+            <Image src={formData.ImageURL} alt="Item Image" boxSize="100%" objectFit="contain" />
           </Box>
+        ) : (
+          <Text mt={4}>No Image</Text>
         )}
-        <Box mt={2} p={4} borderWidth="1px" borderRadius="lg" width="500px">
-          <Heading size="sm">Description:</Heading>
-          <p>{formData.Description || "No Description"}</p>
-        </Box>
-        {formData.containsItems.length > 0 && (
-          <Box mt={4} p={4} borderWidth="1px" borderRadius="lg" width="100%">
-            <Heading size="md">Contains:</Heading>
-            <Box display="flex" flexWrap="wrap" justifyContent="center">
-              {formData.containsItems.map((item, index) => (
-                <Box key={index} m={2} p={2} borderWidth="1px" borderRadius="lg" width="45%" display="flex" flexDirection="column" alignItems="center" onClick={() => handleItemClick(item.ID)} cursor="pointer">
-                  <Heading size="sm">ID: {item.ID}</Heading>
-                  <Box mt={1}><strong>Item:</strong> {item.Item}</Box>
-                  <Box mt={2} maxWidth="200px" maxHeight="200px" borderWidth="1px" borderRadius="lg" overflow="hidden" display="flex" alignItems="center" justifyContent="center">
-                    {item.ImageURL === "No Image" ? (
-                      <Box width="100%" height="100%" display="flex" alignItems="center" justifyContent="center">
-                        No Image
-                      </Box>
-                    ) : (
-                      <Image src={item.ImageURL} alt="Item Image" boxSize="100%" objectFit="contain" onClick={(e) => { e.stopPropagation(); openModal(item.ImageURL); }} cursor="pointer" />
-                    )}
-                  </Box>
-                  <Box mt={2}>
-                    <Heading size="sm">Description:</Heading>
-                    <p>{item.Description || "No Description"}</p>
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-          </Box>
-        )}
+        <Text mt={4}><strong>Description:</strong> {formData.Description}</Text>
         <Button type="submit" colorScheme="teal" mt={4}>Submit</Button>
       </Box>
-
-      <Modal isOpen={isModalOpen} onClose={closeModal} size="full">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalCloseButton />
-          <ModalBody display="flex" justifyContent="center" alignItems="center">
-            <Box width="40%" height="40%" display="flex" justifyContent="center" alignItems="center" position="relative">
-              <Image src={selectedImage} alt="Full Screen Image" width="100%" height="100%" objectFit="contain" />
-            </Box>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+      <Button
+        colorScheme="teal"
+        mt={4}
+        onClick={handleShowInGrid}
+        isDisabled={!itemExistsInGrid}
+      >
+        Show in Grid
+      </Button>
+      {containsItems.length > 0 && (
+        <Box mt={8}>
+          <Heading size="md">Contains:</Heading>
+          <SimpleGrid columns={[1, 2, 3]} spacing={4}>
+            {containsItems.map(item => (
+              <Box key={item.ID} p={4} borderWidth="1px" borderRadius="md">
+                <VStack align="start">
+                  <Text><strong>ID:</strong> <Button variant="link" onClick={() => handleItemClick(item.ID)}>{item.ID}</Button></Text>
+                  <Text><strong>Item:</strong> {item.Item}</Text>
+                  <Text><strong>Description:</strong> {item.Description}</Text>
+                  {item.ImageURL ? (
+                    <Image src={item.ImageURL} alt="Item Image" boxSize="100%" objectFit="contain" onClick={() => handleImageClick(item.ImageURL)} />
+                  ) : (
+                    <Text>No Image</Text>
+                  )}
+                </VStack>
+              </Box>
+            ))}
+          </SimpleGrid>
+        </Box>
+      )}
     </Box>
   );
 }
