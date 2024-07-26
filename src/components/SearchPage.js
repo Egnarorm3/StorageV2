@@ -50,7 +50,20 @@ export default function SearchPage({ inventory }) {
   }, [inventory]);
 
   const handleSearch = () => {
-    const results = inventory.filter(item => {
+    const filteredInventory = inventory.filter(item => {
+      return item.Status !== 'FALSE' && item.Status !== 'Old' && item.Status !== 'Prodigy';
+    });
+
+    const prioritizedInventory = filteredInventory.sort((a, b) => {
+      const statusA = a.Status ? a.Status.toUpperCase() : '';
+      const statusB = b.Status ? b.Status.toUpperCase() : '';
+
+      if (statusA === 'TRUE' && (statusB === '' || statusB === ' ')) return -1;
+      if ((statusA === '' || statusA === ' ') && statusB === 'TRUE') return 1;
+      return 0;
+    });
+
+    const results = prioritizedInventory.filter(item => {
       const tags = item.Tags ? item.Tags.split(',').map(tag => tag.trim().toLowerCase()) : [];
       const query = searchQuery.toLowerCase();
       return tags.some(tag => tag.includes(query)) || item.ID.toLowerCase().includes(query);
