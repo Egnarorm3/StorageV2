@@ -1,13 +1,17 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { Box, Input, Button, Heading, SimpleGrid, Image, Text, Flex, VStack } from '@chakra-ui/react';
+import { Box, Input, Button, Heading, SimpleGrid, Image, Text, Flex, VStack, Checkbox, HStack } from '@chakra-ui/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GridHighlightContext } from '../App';
+
+const RESULTS_PER_PAGE = 20;
 
 export default function SearchPage({ inventory }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [itemExistsInGrid, setItemExistsInGrid] = useState({});
   const [itemHighlightID, setItemHighlightID] = useState({});
+  const [filterPalletsOnly, setFilterPalletsOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
   const { setHighlightItem } = useContext(GridHighlightContext);
 
@@ -76,7 +80,13 @@ export default function SearchPage({ inventory }) {
       return bRelevance - aRelevance;
     });
 
-    setSearchResults(results);
+    if (filterPalletsOnly) {
+      setSearchResults(results.filter(item => item.Tags && item.Tags.toLowerCase().includes('pallet')));
+    } else {
+      setSearchResults(results);
+    }
+
+    setCurrentPage(1); // Reset to the first page on new search
   };
 
   const handleNavigate = (id) => {
@@ -93,6 +103,38 @@ export default function SearchPage({ inventory }) {
     }
   };
 
+  const getContainsList = (item) => {
+    const containedItems = inventory.filter(i => i.ShelfContainer === item.ID);
+    const counts = {};
+
+    containedItems.forEach(i => {
+      const key = (['Student Desks', 'Grey Chairs', 'Metal Chairs'].includes(i.Item) && i.Description)
+        ? `${i.Description} ${i.Item}`
+        : i.Item;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    console.log('Contains List for', item.ID, ':', counts);
+
+    return (
+      <Box mt={2}>
+        <Text>Contains:</Text>
+        <ul style={{ textAlign: 'left', paddingLeft: '20px' }}>
+          {Object.keys(counts).map((key, index) => (
+            <li key={index}>{counts[key]} {key}</li>
+          ))}
+        </ul>
+      </Box>
+    );
+  };
+
+  const totalPages = Math.ceil(searchResults.length / RESULTS_PER_PAGE);
+
+  const paginatedResults = searchResults.slice(
+    (currentPage - 1) * RESULTS_PER_PAGE,
+    currentPage * RESULTS_PER_PAGE
+  );
+
   return (
     <Box textAlign="center" mt={8}>
       <Heading>Search Inventory</Heading>
@@ -105,9 +147,14 @@ export default function SearchPage({ inventory }) {
         />
         <Button onClick={handleSearch} ml={2}>Search</Button>
       </Box>
-      {searchResults.length > 0 && (
+      <Box mt={4}>
+        <Checkbox isChecked={filterPalletsOnly} onChange={(e) => setFilterPalletsOnly(e.target.checked)}>
+          Filter for Pallets Only
+        </Checkbox>
+      </Box>
+      {paginatedResults.length > 0 && (
         <SimpleGrid columns={1} spacing={4} mt={8}>
-          {searchResults.map((item, index) => (
+          {paginatedResults.map((item, index) => (
             <Flex key={index} border="1px solid gray" padding={4} borderRadius="md" alignItems="center">
               {item.ImageURL ? (
                 <Image src={item.ImageURL} alt={item.Item} height="200px" objectFit="cover" mr={4} />
@@ -116,30 +163,42 @@ export default function SearchPage({ inventory }) {
                   No Image
                 </Box>
               )}
-              <VStack align="start" spacing={3} flex="1">
-                <Flex width="100%">
-                  <VStack align="start" flex="1" spacing={1}>
-                    <Text>ID: <Button variant="link" onClick={() => handleNavigate(item.ID)}>{item.ID}</Button></Text>
-                    <Text>Item: {item.Item}</Text>
-                    <Text>Description: {item.Description || "No Description"}</Text>
-                    <Button
-                      colorScheme="teal"
-                      onClick={() => handleShowInGrid(item.ID)}
-                      isDisabled={!itemExistsInGrid[item.ID]}
-                    >
-                      Show in Grid
-                    </Button>
-                  </VStack>
-                  <VStack align="start" flex="1" spacing={1}>
-                    <Text>Campus: {item.Campus}</Text>
-                    <Text>Room: {item.Room}</Text>
-                    <Text>Shelf Container: <Button variant="link" onClick={() => handleNavigate(item.ShelfContainer)}>{item.ShelfContainer}</Button></Text>
-                  </VStack>
-                </Flex>
-              </VStack>
+              <Flex width="100%">
+                <VStack align="start" flex="1" spacing={1}>
+                  <Text>ID: <Button variant="link" onClick={() => handleNavigate(item.ID)}>{item.ID}</Button></Text>
+                  <Text>Item: {item.Item}</Text>
+                  <Text>Description: {item.Description || "No Description"}</Text>
+                  <Button
+                    colorScheme="teal"
+                    onClick={() => handleShowInGrid(item.ID)}
+                    isDisabled={!itemExistsInGrid[item.ID]}
+                  >
+                    Show in Grid
+                  </Button>
+                </VStack>
+                <VStack align="start" flex="1" spacing={1}>
+                  <Text>Campus: {item.Campus}</Text>
+                  <Text>Room: {item.Room}</Text>
+                  <Text>Shelf Container: <Button variant="link" onClick={() => handleNavigate(item.ShelfContainer)}>{item.ShelfContainer}</Button></Text>
+                </VStack>
+                <VStack align="start" flex="1" spacing={1}>
+                  {getContainsList(item)}
+                </VStack>
+              </Flex>
             </Flex>
           ))}
         </SimpleGrid>
+      )}
+      {totalPages > 1 && (
+        <HStack justifyContent="center" mt={4}>
+          <Button onClick={() => setCurrentPage(page => Math.max(page - 1, 1))} disabled={currentPage === 1}>
+            Previous
+          </Button>
+          <Text>Page {currentPage} of {totalPages}</Text>
+          <Button onClick={() => setCurrentPage(page => Math.min(page + 1, totalPages))} disabled={currentPage === totalPages}>
+            Next
+          </Button>
+        </HStack>
       )}
     </Box>
   );
