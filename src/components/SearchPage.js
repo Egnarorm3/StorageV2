@@ -15,6 +15,7 @@ export default function SearchPage({ inventory }) {
   const [selectedCampuses, setSelectedCampuses] = useState({ None: true });
   const [selectedRooms, setSelectedRooms] = useState({ None: true });
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedItems, setExpandedItems] = useState({});
   const navigate = useNavigate();
   const { setHighlightItem } = useContext(GridHighlightContext);
 
@@ -89,7 +90,7 @@ export default function SearchPage({ inventory }) {
 
     const prioritizedInventory = filteredInventory.sort((a, b) => {
       const statusA = a.Status ? a.Status.toUpperCase() : '';
-      const statusB = b.Status ? b.Status.toUpperCase() : '';
+      const statusB = b.Status ? a.Status.toUpperCase() : '';
 
       if (statusA === 'TRUE' && (statusB === '' || statusB === ' ')) return -1;
       if ((statusA === '' || statusA === ' ') && statusB === 'TRUE') return 1;
@@ -107,7 +108,7 @@ export default function SearchPage({ inventory }) {
       return itemMatches && campusMatches && roomMatches;
     }).sort((a, b) => {
       const aTags = a.Tags ? a.Tags.split(',').map(tag => tag.trim().toLowerCase()) : [];
-      const bTags = b.Tags ? b.Tags.split(',').map(tag => tag.trim().toLowerCase()) : [];
+      const bTags = b.Tags ? a.Tags.split(',').map(tag => tag.trim().toLowerCase()) : [];
       const query = searchQuery.toLowerCase();
       const aRelevance = aTags.reduce((acc, tag) => acc + (tag.includes(query) ? 1 : 0), 0);
       const bRelevance = bTags.reduce((acc, tag) => acc + (tag.includes(query) ? 1 : 0), 0);
@@ -116,6 +117,7 @@ export default function SearchPage({ inventory }) {
 
     setSearchResults(results);
     setCurrentPage(1); // Reset to the first page on new search
+    setExpandedItems({}); // Reset expanded items on new search
   };
 
   const handleNavigate = (id) => {
@@ -177,9 +179,45 @@ export default function SearchPage({ inventory }) {
     );
   };
 
-  const totalPages = Math.ceil(searchResults.length / RESULTS_PER_PAGE);
+  const combineItems = (results) => {
+    const combined = [];
+    const map = new Map();
 
-  const paginatedResults = searchResults.slice(
+    results.forEach(item => {
+      const key = `${item.Item}|${item.Description}|${item.ImageURL}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          ...item,
+          quantity: 1,
+          ids: [item.ID],
+          campuses: [item.Campus],
+          rooms: [item.Room],
+          shelfContainers: [item.ShelfContainer]
+        });
+      } else {
+        const existing = map.get(key);
+        existing.quantity += 1;
+        existing.ids.push(item.ID);
+        existing.campuses.push(item.Campus);
+        existing.rooms.push(item.Room);
+        existing.shelfContainers.push(item.ShelfContainer);
+      }
+    });
+
+    map.forEach(value => {
+      combined.push(value);
+    });
+
+    return combined;
+  };
+
+  const toggleExpandItem = (key) => {
+    setExpandedItems(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const combinedResults = combineItems(searchResults);
+  const totalPages = Math.ceil(combinedResults.length / RESULTS_PER_PAGE);
+  const paginatedResults = combinedResults.slice(
     (currentPage - 1) * RESULTS_PER_PAGE,
     currentPage * RESULTS_PER_PAGE
   );
@@ -196,10 +234,10 @@ export default function SearchPage({ inventory }) {
         />
         <Button onClick={handleSearch} ml={2}>Search</Button>
       </Box>
-      <Box mt={4}>
+      <Box mt={4} textAlign="left">
         <Button onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}>Filter</Button>
         <Collapse in={filterDropdownOpen} animateOpacity>
-          <Stack direction="row" spacing={8} mt={4} justify="center">
+          <Stack direction="row" spacing={4} mt={4} bg="gray.100" p={4} borderRadius="md">
             <Box>
               <Text fontWeight="bold">Item</Text>
               <Button size="xs" onClick={() => handleSelectAll('item', true)}>Select All</Button>
@@ -220,15 +258,23 @@ export default function SearchPage({ inventory }) {
               <Text fontWeight="bold">Campus</Text>
               <Button size="xs" onClick={() => handleSelectAll('campus', true)}>Select All</Button>
               <Button size="xs" ml={2} onClick={() => handleSelectAll('campus', false)}>Deselect All</Button>
+              <Checkbox
+                isChecked={selectedCampuses['None']}
+                onChange={(e) => setSelectedCampuses(prev => ({ ...prev, None: e.target.checked }))}
+              >
+                None
+              </Checkbox>
               <Box maxHeight="200px" overflowY="auto" mt={2}>
                 {Object.keys(selectedCampuses).map((campus, index) => (
-                  <Checkbox
-                    key={index}
-                    isChecked={selectedCampuses[campus]}
-                    onChange={(e) => setSelectedCampuses(prev => ({ ...prev, [campus]: e.target.checked }))}
-                  >
-                    {campus}
-                  </Checkbox>
+                  campus !== 'None' && (
+                    <Checkbox
+                      key={index}
+                      isChecked={selectedCampuses[campus]}
+                      onChange={(e) => setSelectedCampuses(prev => ({ ...prev, [campus]: e.target.checked }))}
+                    >
+                      {campus}
+                    </Checkbox>
+                  )
                 ))}
               </Box>
             </Box>
@@ -236,15 +282,23 @@ export default function SearchPage({ inventory }) {
               <Text fontWeight="bold">Room</Text>
               <Button size="xs" onClick={() => handleSelectAll('room', true)}>Select All</Button>
               <Button size="xs" ml={2} onClick={() => handleSelectAll('room', false)}>Deselect All</Button>
+              <Checkbox
+                isChecked={selectedRooms['None']}
+                onChange={(e) => setSelectedRooms(prev => ({ ...prev, None: e.target.checked }))}
+              >
+                None
+              </Checkbox>
               <Box maxHeight="200px" overflowY="auto" mt={2}>
                 {Object.keys(selectedRooms).map((room, index) => (
-                  <Checkbox
-                    key={index}
-                    isChecked={selectedRooms[room]}
-                    onChange={(e) => setSelectedRooms(prev => ({ ...prev, [room]: e.target.checked }))}
-                  >
-                    {room}
-                  </Checkbox>
+                  room !== 'None' && (
+                    <Checkbox
+                      key={index}
+                      isChecked={selectedRooms[room]}
+                      onChange={(e) => setSelectedRooms(prev => ({ ...prev, [room]: e.target.checked }))}
+                    >
+                      {room}
+                    </Checkbox>
+                  )
                 ))}
               </Box>
             </Box>
@@ -254,47 +308,102 @@ export default function SearchPage({ inventory }) {
       {paginatedResults.length > 0 && (
         <SimpleGrid columns={1} spacing={4} mt={8}>
           {paginatedResults.map((item, index) => (
-            <Flex key={index} border="1px solid gray" padding={4} borderRadius="md" alignItems="center">
-              {item.ImageURL ? (
-                <Image src={item.ImageURL} alt={item.Item} height="200px" objectFit="cover" mr={4} />
-              ) : (
-                <Box height="200px" width="200px" display="flex" alignItems="center" justifyContent="center" border="1px solid gray" mr={4}>
-                  No Image
+            <Box key={index}>
+              <Flex
+                border="1px solid gray"
+                padding={4}
+                borderRadius="md"
+                alignItems="center"
+                bg={item.Status ? 'white' : 'gray.200'}
+                borderTop={index > 0 && !paginatedResults[index - 1].Status && item.Status ? '2px solid black' : 'none'}
+              >
+                {item.ImageURL ? (
+                  <Image src={item.ImageURL} alt={item.Item} height="200px" objectFit="cover" mr={4} />
+                ) : (
+                  <Box height="200px" width="200px" display="flex" alignItems="center" justifyContent="center" border="1px solid gray" mr={4}>
+                    No Image
+                  </Box>
+                )}
+                <VStack align="start" spacing={3} flex="1">
+                  <Flex width="100%">
+                    <VStack align="start" flex="1" spacing={1}>
+                      <Text>Item: {item.Item}</Text>
+                      <Text>Description: {item.Description || "No Description"}</Text>
+                      {item.quantity > 1 && (
+                        <Text>Quantity: {item.quantity}</Text>
+                      )}
+                      {item.quantity <= 1 && (
+                        <Button
+                          colorScheme="teal"
+                          onClick={() => handleShowInGrid(item.ID)}
+                          isDisabled={!itemExistsInGrid[item.ID]}
+                        >
+                          Show in Grid
+                        </Button>
+                      )}
+                      {getContainsList(item)}
+                    </VStack>
+                    {item.quantity <= 1 && (
+                      <VStack align="start" flex="1" spacing={1}>
+                        <Text>ID: <Button variant="link" onClick={() => handleNavigate(item.ID)}>{item.ID}</Button></Text>
+                        <Text>Campus: {item.Campus}</Text>
+                        <Text>Room: {item.Room}</Text>
+                        <Text>Shelf Container: {item.ShelfContainer}</Text>
+                      </VStack>
+                    )}
+                    {item.quantity > 1 && (
+                      <VStack align="start" flex="1" spacing={1}>
+                        <Button size="xs" onClick={() => toggleExpandItem(index)}>
+                          {expandedItems[index] ? 'Hide Details' : 'Show Details'}
+                        </Button>
+                      </VStack>
+                    )}
+                  </Flex>
+                </VStack>
+              </Flex>
+              {expandedItems[index] && item.quantity > 1 && (
+                <Box mt={2} ml={12} borderLeft="2px solid gray" pl={4}>
+                  {item.ids.map((id, idx) => (
+                    <Flex
+                      key={idx}
+                      mt={2}
+                      padding={2}
+                      border="1px solid gray"
+                      borderRadius="md"
+                      bg={item.Status ? 'white' : 'gray.200'}
+                    >
+                      <Text>ID: <Button variant="link" onClick={() => handleNavigate(id)}>{id}</Button></Text>
+                      <Text ml={4}>Campus: {item.campuses[idx]}</Text>
+                      <Text ml={4}>Room: {item.rooms[idx]}</Text>
+                      <Text ml={4}>Shelf Container: {item.shelfContainers[idx]}</Text>
+                      <Button
+                        colorScheme="teal"
+                        onClick={() => handleShowInGrid(id)}
+                        isDisabled={!itemExistsInGrid[id]}
+                      >
+                        Show in Grid
+                      </Button>
+                    </Flex>
+                  ))}
                 </Box>
               )}
-              <VStack align="start" spacing={3} flex="1">
-                <Flex width="100%">
-                  <VStack align="start" flex="1" spacing={1}>
-                    <Text>ID: <Button variant="link" onClick={() => handleNavigate(item.ID)}>{item.ID}</Button></Text>
-                    <Text>Item: {item.Item}</Text>
-                    <Text>Description: {item.Description || "No Description"}</Text>
-                    <Button
-                      colorScheme="teal"
-                      onClick={() => handleShowInGrid(item.ID)}
-                      isDisabled={!itemExistsInGrid[item.ID]}
-                    >
-                      Show in Grid
-                    </Button>
-                    {getContainsList(item)}
-                  </VStack>
-                  <VStack align="start" flex="1" spacing={1}>
-                    <Text>Campus: {item.Campus}</Text>
-                    <Text>Room: {item.Room}</Text>
-                    <Text>Shelf Container: <Button variant="link" onClick={() => handleNavigate(item.ShelfContainer)}>{item.ShelfContainer}</Button></Text>
-                  </VStack>
-                </Flex>
-              </VStack>
-            </Flex>
+            </Box>
           ))}
         </SimpleGrid>
       )}
       {totalPages > 1 && (
         <HStack mt={4} justify="center">
-          <Button onClick={() => setCurrentPage(page => Math.max(page - 1, 1))} disabled={currentPage === 1}>
+          <Button onClick={() => setCurrentPage(page => {
+            setExpandedItems({});
+            return Math.max(page - 1, 1);
+          })} disabled={currentPage === 1}>
             Previous
           </Button>
           <Text>Page {currentPage} of {totalPages}</Text>
-          <Button onClick={() => setCurrentPage(page => Math.min(page + 1, totalPages))} disabled={currentPage === totalPages}>
+          <Button onClick={() => setCurrentPage(page => {
+            setExpandedItems({});
+            return Math.min(page + 1, totalPages);
+          })} disabled={currentPage === totalPages}>
             Next
           </Button>
         </HStack>
