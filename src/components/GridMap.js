@@ -10,6 +10,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
   const [smartSearchMode, setSmartSearchMode] = useState(false);
   const [smartSearchResults, setSmartSearchResults] = useState([]);
   const [popupResults, setPopupResults] = useState(null);
+  const [zoom, setZoom] = useState(1); // Added state for zoom level
   const { highlightItem } = useContext(GridHighlightContext);
   const navigate = useNavigate();
 
@@ -34,7 +35,10 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
       const response3 = await fetch('https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=room3');
       const data3 = await response3.json();
 
-      setGridData({ room1: data1, room2: data2, room3: data3 });
+      // Cut off everything under row 25 in room1
+      const filteredData1 = data1.slice(0, 24);
+
+      setGridData({ room1: filteredData1, room2: data2, room3: data3 });
     } catch (error) {
       console.error('Error fetching grid data:', error);
     }
@@ -53,7 +57,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
 
   const renderGrid = (data) => {
     return data.map((row, rowIndex) => (
-      <Flex key={rowIndex}>
+      <Flex key={rowIndex} wrap="nowrap">
         {Object.entries(row).map(([key, value]) => (
           <Box
             key={key}
@@ -71,7 +75,8 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
             whiteSpace="nowrap"
             overflow="hidden"
             textOverflow="ellipsis"
-            maxWidth="100px"
+            width={`${100 * zoom}px`}
+            height={`${100 * zoom}px`} // Ensure cells are squares
           >
             {value}
           </Box>
@@ -137,6 +142,14 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
     navigate(`/view?id=${id}`, { state: { from: 'search' } });
   };
 
+  const handleZoomIn = () => {
+    setZoom(prevZoom => prevZoom + 0.1);
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prevZoom => (prevZoom > 0.2 ? prevZoom - 0.1 : prevZoom));
+  };
+
   return (
     <Box textAlign="center">
       <Heading>Grid Map</Heading>
@@ -183,11 +196,17 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
           />
         )}
       </Box>
-      <VStack>
-        {currentRoom === 'room1' && renderGrid(gridData.room1)}
-        {currentRoom === 'room2' && renderGrid(gridData.room2)}
-        {currentRoom === 'room3' && renderGrid(gridData.room3)}
-      </VStack>
+      <Box mb={4}>
+        <Button onClick={handleZoomIn} mr={2}>Zoom In</Button>
+        <Button onClick={handleZoomOut}>Zoom Out</Button>
+      </Box>
+      <Box overflowX="auto" width="100%">
+        <VStack>
+          {currentRoom === 'room1' && renderGrid(gridData.room1)}
+          {currentRoom === 'room2' && renderGrid(gridData.room2)}
+          {currentRoom === 'room3' && renderGrid(gridData.room3)}
+        </VStack>
+      </Box>
       {popupResults && (
         <Box
           position="fixed"
@@ -217,20 +236,19 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
               {popupResults.map((result, index) => (
                 <Flex key={index} p={2} w="100%" justify="space-between" alignItems="center" border="1px solid #ccc" borderRadius="md">
                   {result.ImageURL ? (
-                    <Image src={result.ImageURL} alt={result.Item} height="50px" objectFit="cover" mr={4} />
+                    <Image src={result.ImageURL} alt={result.Item} height="50px" mr={4} />
                   ) : (
                     <Box height="50px" width="50px" display="flex" alignItems="center" justifyContent="center" border="1px solid gray" mr={4}>
                       No Image
                     </Box>
                   )}
-                  <Text>ID: {result.ID}</Text>
-                  <Text>Item: {result.Item}</Text>
-                  <Text>Description: {result.Description}</Text>
+                  <Text>{result.Item}</Text>
+                  <Text>{result.Description}</Text>
                   <Button onClick={() => handleNavigate(result.ID)}>View</Button>
                 </Flex>
               ))}
             </VStack>
-            <Button mt={4} onClick={() => setPopupResults(null)}>Close</Button>
+            <Button onClick={() => setPopupResults(null)} mt={4}>Close</Button>
           </Box>
         </Box>
       )}
