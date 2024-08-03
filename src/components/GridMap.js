@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Box, Button, Input, Heading, VStack, Flex } from '@chakra-ui/react';
+import { Box, Button, Input, Heading, VStack, Flex, Text, Image } from '@chakra-ui/react';
+import { useNavigate } from 'react-router-dom';
 import { GridHighlightContext } from '../App';
 
 export default function GridMap({ items, onAssignItem, onSubmit }) {
   const [gridData, setGridData] = useState({ room1: [], room2: [], room3: [] });
   const [currentRoom, setCurrentRoom] = useState('room1');
   const [searchQuery, setSearchQuery] = useState('');
+  const [smartSearchMode, setSmartSearchMode] = useState(false);
+  const [smartSearchResults, setSmartSearchResults] = useState([]);
+  const [popupResults, setPopupResults] = useState(null);
   const { highlightItem } = useContext(GridHighlightContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchGridData();
@@ -36,7 +41,14 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
   };
 
   const handleCellClick = (value) => {
-    setSearchQuery(value);
+    if (smartSearchMode) {
+      const results = smartSearchResults.filter(result => 
+        result.ID === value || result.ShelfContainer === value
+      );
+      setPopupResults(results);
+    } else {
+      setSearchQuery(value);
+    }
   };
 
   const renderGrid = (data) => {
@@ -47,9 +59,14 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
             key={key}
             className="grid-cell"
             onClick={() => handleCellClick(value)}
-            bg={value.toLowerCase().includes(searchQuery.toLowerCase()) ? 'yellow' : 'white'}
+            bg={
+              smartSearchMode 
+                ? (smartSearchResults.some(result => (result.ID === value || result.ShelfContainer === value) && value.trim() !== '') ? 'yellow' : 'white')
+                : (value.toLowerCase().includes(searchQuery.toLowerCase()) && value.trim() !== '' ? 'yellow' : 'white')
+            }
             p={2}
             border="1px solid #ccc"
+            borderRadius="md"
             textAlign="center"
             whiteSpace="nowrap"
             overflow="hidden"
@@ -63,19 +80,61 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
     ));
   };
 
+  const handleSmartSearch = async () => {
+    const filteredInventory = items.filter(item => {
+      return item.Status !== 'FALSE' && item.Status !== 'Old' && item.Status !== 'Prodigy';
+    });
+
+    const prioritizedInventory = filteredInventory.sort((a, b) => {
+      const statusA = a.Status ? a.Status.toUpperCase() : '';
+      const statusB = b.Status ? a.Status.toUpperCase() : '';
+
+      if (statusA === 'TRUE' && (statusB === '' || statusB === ' ')) return -1;
+      if ((statusA === '' || statusA === ' ') && statusB === 'TRUE') return 1;
+      return 0;
+    });
+
+    const results = prioritizedInventory.filter(item => {
+      const tags = item.Tags ? item.Tags.split(',').map(tag => tag.trim().toLowerCase()) : [];
+      const query = searchQuery.toLowerCase();
+      return tags.some(tag => tag.includes(query)) || item.ID.toLowerCase().includes(query);
+    });
+
+    setSmartSearchResults(results);
+  };
+
   const roomResults = (room) => {
-    return gridData[room].reduce(
-      (acc, row) =>
-        acc +
-        Object.values(row).reduce(
-          (cellAcc, cell) =>
-            cell.toLowerCase().includes(searchQuery.toLowerCase())
-              ? cellAcc + 1
-              : cellAcc,
-          0
-        ),
-      0
-    );
+    if (smartSearchMode) {
+      return gridData[room].reduce(
+        (acc, row) =>
+          acc +
+          Object.values(row).reduce(
+            (cellAcc, cell) =>
+              smartSearchResults.some(result => (result.ID === cell || result.ShelfContainer === cell) && cell.trim() !== '')
+                ? cellAcc + 1
+                : cellAcc,
+            0
+          ),
+        0
+      );
+    } else {
+      return gridData[room].reduce(
+        (acc, row) =>
+          acc +
+          Object.values(row).reduce(
+            (cellAcc, cell) =>
+              cell.toLowerCase().includes(searchQuery.toLowerCase()) && cell.trim() !== ''
+                ? cellAcc + 1
+                : cellAcc,
+            0
+          ),
+        0
+      );
+    }
+  };
+
+  const handleNavigate = (id) => {
+    navigate(`/view?id=${id}`, { state: { from: 'search' } });
   };
 
   return (
@@ -104,17 +163,77 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
         </Button>
       </Box>
       <Box mb={4}>
-        <Input
-          placeholder="Search in grid"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <Button onClick={() => setSmartSearchMode(!smartSearchMode)} mb={2}>
+          {smartSearchMode ? 'Switch to Normal Search' : 'Switch to Smart Search'}
+        </Button>
+        {smartSearchMode ? (
+          <Box>
+            <Input
+              placeholder="Smart Search in grid"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Button onClick={handleSmartSearch} ml={2}>Search</Button>
+          </Box>
+        ) : (
+          <Input
+            placeholder="Search in grid"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        )}
       </Box>
       <VStack>
         {currentRoom === 'room1' && renderGrid(gridData.room1)}
         {currentRoom === 'room2' && renderGrid(gridData.room2)}
         {currentRoom === 'room3' && renderGrid(gridData.room3)}
       </VStack>
+      {popupResults && (
+        <Box
+          position="fixed"
+          top="0"
+          left="0"
+          width="100vw"
+          height="100vh"
+          bg="rgba(0, 0, 0, 0.5)"
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          zIndex="1000"
+          p={4}
+          overflowY="auto"
+        >
+          <Box
+            bg="white"
+            p={4}
+            border="1px solid #ccc"
+            borderRadius="md"
+            maxHeight="80vh"
+            overflowY="auto"
+            width="80%"
+          >
+            <Heading size="md">Search Results</Heading>
+            <VStack mt={4}>
+              {popupResults.map((result, index) => (
+                <Flex key={index} p={2} w="100%" justify="space-between" alignItems="center" border="1px solid #ccc" borderRadius="md">
+                  {result.ImageURL ? (
+                    <Image src={result.ImageURL} alt={result.Item} height="50px" objectFit="cover" mr={4} />
+                  ) : (
+                    <Box height="50px" width="50px" display="flex" alignItems="center" justifyContent="center" border="1px solid gray" mr={4}>
+                      No Image
+                    </Box>
+                  )}
+                  <Text>ID: {result.ID}</Text>
+                  <Text>Item: {result.Item}</Text>
+                  <Text>Description: {result.Description}</Text>
+                  <Button onClick={() => handleNavigate(result.ID)}>View</Button>
+                </Flex>
+              ))}
+            </VStack>
+            <Button mt={4} onClick={() => setPopupResults(null)}>Close</Button>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }
