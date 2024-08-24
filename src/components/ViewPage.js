@@ -97,6 +97,7 @@ export default function ViewPage() {
     }));
 
     if (name === 'ID' && value) {
+      navigate(`/view?id=${encodeURIComponent(value)}`, { replace: true });
       await fetchDataForID(value);
     }
   };
@@ -113,7 +114,7 @@ export default function ViewPage() {
           Department: item.Department,
           Room: item.Room,
           ShelfContainer: item.ShelfContainer,
-          ImageURL: item.ImageURL || "No Image", // Set the ImageURL from the fetched data
+          ImageURL: item.ImageURL || "No Image",
           Description: item.Description || "No Description"
         }));
         fetchContainsItems(item.ID);
@@ -175,6 +176,7 @@ export default function ViewPage() {
       ID: code
     }));
 
+    navigate(`/view?id=${encodeURIComponent(code)}`, { replace: true });
     fetchDataForID(code);
   };
 
@@ -274,6 +276,7 @@ export default function ViewPage() {
   const handleItemClick = (id) => {
     prevID.current = formData.ID;
     setFormData({ ...formData, ID: id });
+    navigate(`/view?id=${encodeURIComponent(id)}`, { replace: true });
     fetchDataForID(id);
   };
 

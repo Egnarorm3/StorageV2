@@ -84,6 +84,9 @@ export default function SearchPage({ inventory }) {
   }, [inventory]);
 
   const handleSearch = () => {
+    // Update the URL with the search query
+    navigate(`/search?query=${encodeURIComponent(searchQuery)}`, { replace: true });
+
     const filteredInventory = inventory.filter(item => {
       return item.Status !== 'FALSE' && item.Status !== 'Old' && item.Status !== 'Prodigy';
     });
@@ -119,6 +122,16 @@ export default function SearchPage({ inventory }) {
     setCurrentPage(1); // Reset to the first page on new search
     setExpandedItems({}); // Reset expanded items on new search
   };
+
+  // Listen for URL changes to update the search query state when the component mounts
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const query = params.get('query');
+    if (query) {
+      setSearchQuery(query);
+      handleSearch();
+    }
+  }, []);
 
   const handleNavigate = (id) => {
     navigate(`/view?id=${id}`, { state: { from: 'search' } });
