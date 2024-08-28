@@ -219,10 +219,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
 
   const handleAddRoom = async () => {
     try {
-      await addRoomToLegend(newRoomName, newRoomOrientation);
-
-      // Trigger Google Apps Script to create the sheet
-      const response = await fetch('https://script.google.com/macros/s/AKfycbwXv30lh2Pzk1ieVVBLzEZthuQf7YJRptC5tTx4rYtJKkPQnsrGo8HHe5_QbKMtbNd8JQ/exec', {
+      const response = await fetch(process.env.REACT_APP_GOOGLE_SCRIPT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -231,21 +228,21 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
           roomName: newRoomName,
         }),
       });
-
+  
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-
+  
       const result = await response.json();
       console.log(result);
-      
-      // Fetch the updated rooms list
+  
       fetchRoomsFromLegend();
       onClose();
     } catch (error) {
       console.error('Error creating room:', error);
     }
   };
+  
 
   return (
     <Box textAlign="center">
