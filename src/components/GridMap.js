@@ -1,21 +1,42 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Box, Button, Input, Heading, VStack, Flex, Text, Image } from '@chakra-ui/react';
+import {
+  Box,
+  Button,
+  Input,
+  Heading,
+  VStack,
+  Flex,
+  Text,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  Image,
+} from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { GridHighlightContext } from '../App';
 
 export default function GridMap({ items, onAssignItem, onSubmit }) {
-  const [gridData, setGridData] = useState({ room1: [], room2: [], room3: [] });
-  const [currentRoom, setCurrentRoom] = useState('room1');
+  const [gridData, setGridData] = useState({});
+  const [rooms, setRooms] = useState([]);
+  const [currentRoom, setCurrentRoom] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [smartSearchMode, setSmartSearchMode] = useState(false);
   const [smartSearchResults, setSmartSearchResults] = useState([]);
   const [popupResults, setPopupResults] = useState(null);
-  const [zoom, setZoom] = useState(1); // Added state for zoom level
+  const [zoom, setZoom] = useState(1); // State for zoom level
   const { highlightItem } = useContext(GridHighlightContext);
   const navigate = useNavigate();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomOrientation, setNewRoomOrientation] = useState('');
 
   useEffect(() => {
-    fetchGridData();
+    fetchRoomsFromLegend();
   }, []);
 
   useEffect(() => {
@@ -24,23 +45,41 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
     }
   }, [highlightItem]);
 
-  const fetchGridData = async () => {
+  const fetchRoomsFromLegend = async () => {
     try {
-      const response1 = await fetch('https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=room1');
-      const data1 = await response1.json();
+      const response = await fetch('https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=Legend');
+      const data = await response.json();
 
-      const response2 = await fetch('https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=room2');
-      const data2 = await response2.json();
+      const validRooms = data
+        .filter(item => item.Map === 'TRUE')
+        .map(item => item.Room);
 
-      const response3 = await fetch('https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=room3');
-      const data3 = await response3.json();
+      setRooms(validRooms);
 
-      // Cut off everything under row 25 in room1
-      const filteredData1 = data1.slice(0, 24);
-
-      setGridData({ room1: filteredData1, room2: data2, room3: data3 });
+      if (validRooms.length > 0) {
+        setCurrentRoom(validRooms[0]);
+        fetchGridData(validRooms[0]);
+      }
     } catch (error) {
-      console.error('Error fetching grid data:', error);
+      console.error('Error fetching rooms from Legend:', error);
+    }
+  };
+
+  const fetchGridData = async (room) => {
+    try {
+      const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=${room}`);
+      const data = await response.json();
+
+      setGridData(prevGridData => ({ ...prevGridData, [room]: data }));
+    } catch (error) {
+      console.error(`Error fetching grid data for ${room}:`, error);
+    }
+  };
+
+  const handleRoomChange = (room) => {
+    setCurrentRoom(room);
+    if (!gridData[room]) {
+      fetchGridData(room);
     }
   };
 
@@ -56,6 +95,10 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
   };
 
   const renderGrid = (data) => {
+    if (!data || data.length === 0) {
+      return <Text>No data available for this room.</Text>;
+    }
+  
     return data.map((row, rowIndex) => (
       <Flex key={rowIndex} wrap="nowrap">
         {Object.entries(row).map(([key, value]) => (
@@ -84,6 +127,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
       </Flex>
     ));
   };
+  
 
   const handleSmartSearch = async () => {
     const filteredInventory = items.filter(item => {
@@ -110,7 +154,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
 
   const roomResults = (room) => {
     if (smartSearchMode) {
-      return gridData[room].reduce(
+      return gridData[room]?.reduce(
         (acc, row) =>
           acc +
           Object.values(row).reduce(
@@ -123,7 +167,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
         0
       );
     } else {
-      return gridData[room].reduce(
+      return gridData[room]?.reduce(
         (acc, row) =>
           acc +
           Object.values(row).reduce(
@@ -150,61 +194,115 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
     setZoom(prevZoom => (prevZoom > 0.2 ? prevZoom - 0.1 : prevZoom));
   };
 
+  const addRoomToLegend = async (roomName, orientation) => {
+    try {
+      const data = {
+        "Room": roomName,
+        "Map": "TRUE",
+        "Orientation": orientation
+      };
+
+      const response = await fetch('https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=Legend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      console.log("Room added to Legend:", result);
+    } catch (error) {
+      console.error("Error adding room to Legend:", error);
+    }
+  };
+
+  const handleAddRoom = async () => {
+    try {
+      await addRoomToLegend(newRoomName, newRoomOrientation);
+
+      // Trigger Google Apps Script to create the sheet
+      const response = await fetch('https://script.google.com/macros/s/AKfycbwXv30lh2Pzk1ieVVBLzEZthuQf7YJRptC5tTx4rYtJKkPQnsrGo8HHe5_QbKMtbNd8JQ/exec', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roomName: newRoomName,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const result = await response.json();
+      console.log(result);
+      
+      // Fetch the updated rooms list
+      fetchRoomsFromLegend();
+      onClose();
+    } catch (error) {
+      console.error('Error creating room:', error);
+    }
+  };
+
   return (
     <Box textAlign="center">
       <Heading>Grid Map</Heading>
       <Box mb={4}>
-        <Button
-          colorScheme={currentRoom === 'room1' ? 'teal' : 'gray'}
-          onClick={() => setCurrentRoom('room1')}
-          mr={2}
-        >
-          Room 1 ({roomResults('room1')} results)
-        </Button>
-        <Button
-          colorScheme={currentRoom === 'room2' ? 'teal' : 'gray'}
-          onClick={() => setCurrentRoom('room2')}
-          mr={2}
-        >
-          Room 2 ({roomResults('room2')} results)
-        </Button>
-        <Button
-          colorScheme={currentRoom === 'room3' ? 'teal' : 'gray'}
-          onClick={() => setCurrentRoom('room3')}
-        >
-          Room 3 ({roomResults('room3')} results)
-        </Button>
+        {rooms.map(room => (
+          <Button
+            key={room}
+            colorScheme={currentRoom === room ? 'teal' : 'gray'}
+            onClick={() => handleRoomChange(room)}
+            mr={2}
+          >
+            {room} ({roomResults(room)} results)
+          </Button>
+        ))}
+        <Button onClick={onOpen} ml={2}>+</Button>
       </Box>
-      <Box mb={4}>
-        <Button onClick={() => setSmartSearchMode(!smartSearchMode)} mb={2}>
-          {smartSearchMode ? 'Switch to Normal Search' : 'Switch to Smart Search'}
-        </Button>
-        {smartSearchMode ? (
-          <Box>
+
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Create a New Room</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
             <Input
-              placeholder="Smart Search in grid"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Room Name"
+              value={newRoomName}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              mb={4}
             />
-            <Button onClick={handleSmartSearch} ml={2}>Search</Button>
-          </Box>
-        ) : (
-          <Input
-            placeholder="Search in grid"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        )}
-      </Box>
+            <Input
+              placeholder="Orientation"
+              value={newRoomOrientation}
+              onChange={(e) => setNewRoomOrientation(e.target.value)}
+              mb={2}
+            />
+            <Text fontSize="sm" color="gray.500">
+              The direction that should be faced when following the map. For example: "Facing the loading area" or "Facing the main brown door next to the electrical panel"
+            </Text>
+          </ModalBody>
+
+          <ModalFooter>
+            <Button colorScheme="blue" mr={3} onClick={handleAddRoom}>
+              Add
+            </Button>
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
       <Box mb={4}>
         <Button onClick={handleZoomIn} mr={2}>Zoom In</Button>
         <Button onClick={handleZoomOut}>Zoom Out</Button>
       </Box>
       <Box overflowX="auto" width="100%">
         <VStack>
-          {currentRoom === 'room1' && renderGrid(gridData.room1)}
-          {currentRoom === 'room2' && renderGrid(gridData.room2)}
-          {currentRoom === 'room3' && renderGrid(gridData.room3)}
+          {rooms.includes(currentRoom) && renderGrid(gridData[currentRoom] || [])}
         </VStack>
       </Box>
       {popupResults && (

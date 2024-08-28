@@ -6,6 +6,7 @@ import MovePage from './components/MovePage';
 import ViewPage from './components/ViewPage';
 import GridMap from './components/GridMap';
 import SearchPage from './components/SearchPage';
+import PlacePage from './components/PlacePage'; // Import the new component
 
 export const GridHighlightContext = createContext();
 
@@ -100,6 +101,7 @@ export default function App() {
             <ListItem mx={2}><Link to="/view">View</Link></ListItem>
             <ListItem mx={2}><Link to="/grid">Grid Map</Link></ListItem>
             <ListItem mx={2}><Link to="/search">Search</Link></ListItem>
+            <ListItem mx={2}><Link to="/place">Place</Link></ListItem> {/* New tab added */}
           </List>
         </Flex>
         <Box p={4}>
@@ -110,6 +112,7 @@ export default function App() {
             <Route path="/view" element={<ViewPage />} />
             <Route path="/grid" element={<GridMap items={inventory} onAssignItem={handleAssignItem} onSubmit={handleSubmit} />} />
             <Route path="/search" element={<SearchPage inventory={inventory} />} />
+            <Route path="/place" element={<PlacePage />} /> {/* New route added */}
           </Routes>
         </Box>
       </Box>
@@ -128,6 +131,7 @@ function Home() {
         <ListItem><Button as={Link} to="/view" colorScheme="teal" mt={2}>View</Button></ListItem>
         <ListItem><Button as={Link} to="/grid" colorScheme="teal" mt={2}>Grid Map</Button></ListItem>
         <ListItem><Button as={Link} to="/search" colorScheme="teal" mt={2}>Search</Button></ListItem>
+        <ListItem><Button as={Link} to="/place" colorScheme="teal" mt={2}>Place</Button></ListItem>
       </List>
     </Box>
   );

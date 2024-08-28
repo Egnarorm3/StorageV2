@@ -5,21 +5,20 @@ import {
   Button,
   FormControl,
   FormLabel,
-  Select,
   OrderedList,
   ListItem,
   Heading,
   Input
 } from '@chakra-ui/react';
-
+import Select from 'react-select';
 
 export default function MovePage() {
   const [scannedIds, setScannedIds] = useState([]);
   const [formData, setFormData] = useState({
-    Campus: "",
-    Department: "",
-    Room: "",
-    ShelfContainer: ""
+    Campus: null,
+    Department: null,
+    Room: null,
+    ShelfContainer: null
   });
   const [flash, setFlash] = useState(false);
   const [ids, setIds] = useState([]);
@@ -82,11 +81,10 @@ export default function MovePage() {
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const handleChange = (selectedOption, { name }) => {
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: value
+      [name]: selectedOption
     }));
   };
 
@@ -188,10 +186,10 @@ export default function MovePage() {
 
     const dataToSend = scannedIds.map(id => ({
       ID: id,
-      Campus: formData.Campus,
-      Department: formData.Department,
-      Room: formData.Room,
-      ShelfContainer: formData.ShelfContainer,
+      Campus: formData.Campus ? formData.Campus.value : "",
+      Department: formData.Department ? formData.Department.value : "",
+      Room: formData.Room ? formData.Room.value : "",
+      ShelfContainer: formData.ShelfContainer ? formData.ShelfContainer.value : "",
       Date: currentDate
     }));
 
@@ -252,9 +250,10 @@ export default function MovePage() {
   };
 
   const renderOptions = (options) => {
-    return options.map((option, index) => (
-      <option key={index} value={option}>{option}</option>
-    ));
+    return options.map((option) => ({
+      value: option,
+      label: option
+    }));
   };
 
   return (
@@ -272,31 +271,43 @@ export default function MovePage() {
       <Box className="form">
         <FormControl>
           <FormLabel>Campus</FormLabel>
-          <Select name="Campus" value={formData.Campus} onChange={handleChange}>
-            <option value="">Select Campus</option>
-            {renderOptions(campuses)}
-          </Select>
+          <Select
+            name="Campus"
+            value={formData.Campus}
+            onChange={handleChange}
+            options={renderOptions(campuses)}
+            placeholder="Select Campus"
+          />
         </FormControl>
         <FormControl>
           <FormLabel>Department</FormLabel>
-          <Select name="Department" value={formData.Department} onChange={handleChange}>
-            <option value="">Select Department</option>
-            {renderOptions(departments)}
-          </Select>
+          <Select
+            name="Department"
+            value={formData.Department}
+            onChange={handleChange}
+            options={renderOptions(departments)}
+            placeholder="Select Department"
+          />
         </FormControl>
         <FormControl>
           <FormLabel>Room</FormLabel>
-          <Select name="Room" value={formData.Room} onChange={handleChange}>
-            <option value="">Select Room</option>
-            {renderOptions(rooms)}
-          </Select>
+          <Select
+            name="Room"
+            value={formData.Room}
+            onChange={handleChange}
+            options={renderOptions(rooms)}
+            placeholder="Select Room"
+          />
         </FormControl>
         <FormControl>
           <FormLabel>Shelf Container</FormLabel>
-          <Select name="ShelfContainer" value={formData.ShelfContainer} onChange={handleChange}>
-            <option value="">Select Shelf Container</option>
-            {renderOptions(shelfContainerOptions)}
-          </Select>
+          <Select
+            name="ShelfContainer"
+            value={formData.ShelfContainer}
+            onChange={handleChange}
+            options={renderOptions(shelfContainerOptions)}
+            placeholder="Select Shelf Container"
+          />
         </FormControl>
         {useBarcodeScanner && (
           <Input
@@ -326,15 +337,14 @@ export default function MovePage() {
         )}
         <Heading size="md" mt={4}>Scanned IDs:</Heading>
 
-
-<OrderedList reversed style={{ listStyleType: 'decimal', counterReset: 'list 0' }}>
-  {scannedIds.map((id, index) => (
-    <ListItem key={index} style={{ direction: 'ltr', counterIncrement: 'list -1', display: 'flex', alignItems: 'center' }}>
-      <span style={{ marginRight: '8px' }}>{scannedIds.length - index}.</span>
-      {id} <Button size="xs" colorScheme="red" onClick={() => removeScannedId(id)}>X</Button>
-    </ListItem>
-  ))}
-</OrderedList>
+        <OrderedList reversed style={{ listStyleType: 'decimal', counterReset: 'list 0' }}>
+          {scannedIds.map((id, index) => (
+            <ListItem key={index} style={{ direction: 'ltr', counterIncrement: 'list -1', display: 'flex', alignItems: 'center' }}>
+              <span style={{ marginRight: '8px' }}>{scannedIds.length - index}.</span>
+              {id} <Button size="xs" colorScheme="red" onClick={() => removeScannedId(id)}>X</Button>
+            </ListItem>
+          ))}
+        </OrderedList>
 
         <Button colorScheme="teal" mt={4} onClick={handleSubmit}>Submit All</Button>
       </Box>

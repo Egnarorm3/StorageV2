@@ -5,7 +5,6 @@ import {
   Button,
   FormControl,
   FormLabel,
-  Select,
   Heading,
   Image,
   Text,
@@ -13,16 +12,17 @@ import {
   VStack,
   CloseButton
 } from '@chakra-ui/react';
+import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { GridHighlightContext } from '../App';
 
 export default function ViewPage() {
   const [formData, setFormData] = useState({
-    ID: "",
-    Campus: "",
-    Department: "",
-    Room: "",
-    ShelfContainer: "",
+    ID: null,
+    Campus: null,
+    Department: null,
+    Room: null,
+    ShelfContainer: null,
     ImageURL: "",
     Description: ""
   });
@@ -46,7 +46,7 @@ export default function ViewPage() {
     const query = new URLSearchParams(location.search);
     const id = query.get('id');
     if (id) {
-      setFormData(prevFormData => ({ ...prevFormData, ID: id }));
+      setFormData(prevFormData => ({ ...prevFormData, ID: { value: id, label: id } }));
       fetchDataForID(id);
     }
     fetchDropdownData();
@@ -75,30 +75,31 @@ export default function ViewPage() {
       });
 
       dataInventory.forEach(item => {
-        if (item.ID) idsSet.add(item.ID);
+        if (item.ID && !["FALSE", "Old", "Prodigy"].includes(item.Status)) {
+          idsSet.add({ value: item.ID, label: item.ID });
+        }
         if (item.Item && insidersSet.has(item.Item)) shelfContainerOptionsSet.add(item.ID);
       });
 
       setIds(Array.from(idsSet));
-      setCampuses(Array.from(campusesSet));
-      setDepartments(Array.from(departmentsSet));
-      setRooms(Array.from(roomsSet));
-      setShelfContainerOptions(Array.from(shelfContainerOptionsSet));
+      setCampuses(Array.from(campusesSet).map(c => ({ value: c, label: c })));
+      setDepartments(Array.from(departmentsSet).map(d => ({ value: d, label: d })));
+      setRooms(Array.from(roomsSet).map(r => ({ value: r, label: r })));
+      setShelfContainerOptions(Array.from(shelfContainerOptionsSet).map(s => ({ value: s, label: s })));
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
     }
   };
 
-  const handleChange = async (e) => {
-    const { name, value } = e.target;
+  const handleChange = async (selectedOption, { name }) => {
     setFormData((prevFormData) => ({
       ...prevFormData,
-      [name]: value
+      [name]: selectedOption
     }));
 
-    if (name === 'ID' && value) {
-      navigate(`/view?id=${encodeURIComponent(value)}`, { replace: true });
-      await fetchDataForID(value);
+    if (name === 'ID' && selectedOption) {
+      navigate(`/view?id=${encodeURIComponent(selectedOption.value)}`, { replace: true });
+      await fetchDataForID(selectedOption.value);
     }
   };
 
@@ -110,10 +111,10 @@ export default function ViewPage() {
         const item = data[0];
         setFormData((prevFormData) => ({
           ...prevFormData,
-          Campus: item.Campus,
-          Department: item.Department,
-          Room: item.Room,
-          ShelfContainer: item.ShelfContainer,
+          Campus: { value: item.Campus, label: item.Campus },
+          Department: { value: item.Department, label: item.Department },
+          Room: { value: item.Room, label: item.Room },
+          ShelfContainer: { value: item.ShelfContainer, label: item.ShelfContainer },
           ImageURL: item.ImageURL || "No Image",
           Description: item.Description || "No Description"
         }));
@@ -173,7 +174,7 @@ export default function ViewPage() {
 
     setFormData((prevFormData) => ({
       ...prevFormData,
-      ID: code
+      ID: { value: code, label: code }
     }));
 
     navigate(`/view?id=${encodeURIComponent(code)}`, { replace: true });
@@ -219,11 +220,11 @@ export default function ViewPage() {
     const currentDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
 
     const dataToSend = {
-      ID: data.ID,
-      Campus: data.Campus,
-      Department: data.Department,
-      Room: data.Room,
-      ShelfContainer: data.ShelfContainer,
+      ID: data.ID.value,
+      Campus: data.Campus.value,
+      Department: data.Department.value,
+      Room: data.Room.value,
+      ShelfContainer: data.ShelfContainer.value,
       Date: currentDate
     };
 
@@ -267,15 +268,14 @@ export default function ViewPage() {
     }
   };
 
-  const renderOptions = (options) => {
-    return options.map((option, index) => (
-      <option key={index} value={option}>{option}</option>
-    ));
+  const closeFullscreen = () => {
+    setIsFullscreen(false);
+    setFullscreenImage(null);
   };
 
   const handleItemClick = (id) => {
     prevID.current = formData.ID;
-    setFormData({ ...formData, ID: id });
+    setFormData({ ...formData, ID: { value: id, label: id } });
     navigate(`/view?id=${encodeURIComponent(id)}`, { replace: true });
     fetchDataForID(id);
   };
@@ -283,11 +283,6 @@ export default function ViewPage() {
   const handleImageClick = (url) => {
     setFullscreenImage(url);
     setIsFullscreen(true);
-  };
-
-  const closeFullscreen = () => {
-    setIsFullscreen(false);
-    setFullscreenImage(null);
   };
 
   const handleShowInGrid = () => {
@@ -332,52 +327,67 @@ export default function ViewPage() {
           left="10px"
           zIndex="10"
           onClick={() => {
-            handleItemClick(prevID.current);
+            handleItemClick(prevID.current.value);
             prevID.current = null;
           }}
           boxShadow="md"
         >
-          Back to {prevID.current}
+          Back to {prevID.current?.label}
         </Button>
       )}
       <Heading>View Item</Heading>
       <Box as="form" className="form" onSubmit={handleSubmit}>
         <FormControl>
           <FormLabel>ID</FormLabel>
-          <Select name="ID" value={formData.ID} onChange={handleChange}>
-            <option value="">Select ID</option>
-            {renderOptions(ids)}
-          </Select>
+          <Select
+            name="ID"
+            value={formData.ID}
+            onChange={handleChange}
+            options={ids}
+            placeholder="Select ID"
+          />
         </FormControl>
         <Button colorScheme="teal" mt={4} onClick={startScanner}>Start Scanning</Button>
         <Box id="interactive" className={`viewport ${flash ? "flash" : ""}`} mt={4} />
         <FormControl>
           <FormLabel>Campus</FormLabel>
-          <Select name="Campus" value={formData.Campus} onChange={handleChange}>
-            <option value="">Select Campus</option>
-            {renderOptions(campuses)}
-          </Select>
+          <Select
+            name="Campus"
+            value={formData.Campus}
+            onChange={handleChange}
+            options={campuses}
+            placeholder="Select Campus"
+          />
         </FormControl>
         <FormControl>
           <FormLabel>Department</FormLabel>
-          <Select name="Department" value={formData.Department} onChange={handleChange}>
-            <option value="">Select Department</option>
-            {renderOptions(departments)}
-          </Select>
+          <Select
+            name="Department"
+            value={formData.Department}
+            onChange={handleChange}
+            options={departments}
+            placeholder="Select Department"
+          />
         </FormControl>
         <FormControl>
           <FormLabel>Room</FormLabel>
-          <Select name="Room" value={formData.Room} onChange={handleChange}>
-            <option value="">Select Room</option>
-            {renderOptions(rooms)}
-          </Select>
+          <Select
+            name="Room"
+            value={formData.Room}
+            onChange={handleChange}
+            options={rooms}
+            placeholder="Select Room"
+          />
         </FormControl>
         <FormControl>
           <FormLabel>Shelf Container</FormLabel>
-          <Select name="ShelfContainer" value={formData.ShelfContainer} onChange={handleChange}>
-            <option value="">Select Shelf Container</option>
-            {renderOptions(shelfContainerOptions)}
-          </Select>
+          <Select
+            name="ShelfContainer"
+            value={formData.ShelfContainer}
+            onChange={handleChange}
+            options={shelfContainerOptions}
+            placeholder="Select Shelf Container"
+          />
         </FormControl>
         {formData.ImageURL !== "No Image" ? (
           <Box mt={4} maxWidth="500px" maxHeight="500px" onClick={() => handleImageClick(formData.ImageURL)}>
