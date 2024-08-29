@@ -25,10 +25,34 @@ export default function PlacePage() {
     }
   };
 
+  const fetchLatestGridData = async () => {
+    if (!selectedRoom) return;
+
+    try {
+      const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=${selectedRoom}`);
+      const data = await response.json();
+
+      const itemPosition = findItemPosition(data, adjacentItem);
+      if (itemPosition) {
+        const grid = generateGridWithFetchedData(data, itemPosition);
+        setGridData(grid);
+        console.log('Fetched latest grid data:', grid);
+        return itemPosition; // Return the position of the adjacent item
+      } else {
+        setGridData(null);
+        alert('Adjacent item not found in the room.');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching latest grid data:', error);
+      return null;
+    }
+  };
+
   const handleRoomChange = async (e) => {
     const roomName = e.target.value;
     setSelectedRoom(roomName);
-    
+
     try {
       const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv/search?Room=${roomName}&sheet=Legend`);
       const data = await response.json();
@@ -41,210 +65,195 @@ export default function PlacePage() {
   const handleCheckAdjacentItem = async () => {
     if (!selectedRoom || !adjacentItem) return;
 
-    try {
-      const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=${selectedRoom}`);
-      const data = await response.json();
-
-      const itemPosition = findItemPosition(data, adjacentItem);
-      
-      if (itemPosition) {
-        // Generate the 3x3 grid with adjacentItem in the middle
-        const grid = generateGrid(data, itemPosition);
-        setGridData(grid);
-      } else {
-        setGridData(null);
-        alert('Adjacent item not found in the room.');
-      }
-    } catch (error) {
-      console.error('Error checking adjacent item:', error);
-    }
+    console.log(`Checking item: ${adjacentItem} in room: ${selectedRoom}`);
+    await fetchLatestGridData(); // Refetch the grid data when checking
   };
 
   const findItemPosition = (data, item) => {
+    console.log('Finding item position...');
     for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
       const row = data[rowIndex];
       for (let col in row) {
         if (row[col] === item) {
-          return { row: rowIndex + 1, col };
+          console.log(`Item found at row: ${rowIndex + 1}, col: ${col}`);
+          return { row: rowIndex + 1, col };  // Return the correct row and column
         }
       }
     }
+    console.log('Item not found.');
     return null;
   };
 
-  const generateGrid = (data, { row, col }) => {
+  const generateGridWithFetchedData = (data, { row, col }) => {
     const colIndex = col.charCodeAt(0) - 'A'.charCodeAt(0);
-    const grid = Array(3).fill(null).map(() => Array(3).fill(''));
+    const grid = Array(3).fill(null).map(() => Array(3).fill({ value: '', color: '' }));
 
     for (let r = -1; r <= 1; r++) {
       for (let c = -1; c <= 1; c++) {
         const currentRow = row + r;
         const currentCol = String.fromCharCode('A'.charCodeAt(0) + colIndex + c);
         const cellValue = data[currentRow - 1]?.[currentCol] || '';
-        grid[r + 1][c + 1] = cellValue;
+        grid[r + 1][c + 1] = { value: cellValue, color: '' };
       }
     }
+
+    grid[1][1] = { value: adjacentItem, color: '' }; // Place the adjacent item in the center
 
     return grid;
   };
 
-  const determineNewPosition = (grid, position) => {
-    // Determine the current item position (center of the grid)
-    const currentRow = 1;  // Middle row in a 3x3 grid
-    const currentCol = 1;  // Middle column in a 3x3 grid
+  const handleSelectPosition = (position) => {
+    if (!gridData || !itemId) return;
 
-    let newRow = currentRow;
-    let newCol = currentCol;
+    console.log(`Placing item: ${itemId} at position: ${position}`);
 
+    const newGrid = gridData.map(row => row.map(cell => ({ ...cell }))); // Clone the existing grid
+
+    // Clear the previous placement of itemId
+    for (let rowIndex = 0; rowIndex < newGrid.length; rowIndex++) {
+      for (let colIndex = 0; colIndex < newGrid[rowIndex].length; colIndex++) {
+        if (newGrid[rowIndex][colIndex].value === itemId) {
+          newGrid[rowIndex][colIndex] = gridData[rowIndex][colIndex]; // Restore original value
+        }
+      }
+    }
+
+    // Determine the position to place the item
+    let targetRow = 1;
+    let targetCol = 1;
     switch (position) {
-        case 'Left':
-            newCol = currentCol - 1;
-            break;
-        case 'Right':
-            newCol = currentCol + 1;
-            break;
-        case 'In Front':
-            newRow = currentRow - 1;
-            break;
-        case 'Behind':
-            newRow = currentRow + 1;
-            break;
-        default:
-            console.error("Invalid position: " + position);
-            return null;
+      case 'Left':
+        targetCol = 0;
+        break;
+      case 'Right':
+        targetCol = 2;
+        break;
+      case 'In Front':
+        targetRow = 0;
+        break;
+      case 'Behind':
+        targetRow = 2;
+        break;
+      default:
+        console.error('Invalid position selected');
+        return;
     }
 
-    // Ensure the new position is within the grid bounds
-    if (newRow < 0 || newRow > 2 || newCol < 0 || newCol > 2) {
-        console.error("Calculated new position is out of bounds: Row " + newRow + ", Col " + newCol);
-        return null;
+    // Check if the target position is occupied
+    if (newGrid[targetRow][targetCol].value) {
+      newGrid[targetRow][targetCol] = { value: itemId, color: 'red' }; // Place item and mark as conflict
+    } else {
+      newGrid[targetRow][targetCol] = { value: itemId, color: 'yellow' }; // Place item and mark as valid
     }
 
-    return { newRow, newCol };
-};
+    // Don't update state before submitting to avoid the brief removal of the item
+    console.log('Updated grid:', newGrid);
+  };
 
+  const handleSubmit = async () => {
+    if (!selectedRoom || !itemId || !adjacentPosition) return;
 
+    console.log('Refetching grid data before submitting...');
+    const itemPosition = await fetchLatestGridData(); // Get the position of the adjacent item
+    if (!itemPosition) return; // Abort if fetching fails
 
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycby6zN4sKDKQMwptcMXAjBeJo4VZLg7IGSBi2R0g0-gtlrjDQXw1OQZYxHUnbSLDMUyAIQ/exec'; // Replace with your script URL
 
-const ensureGridSpace = async (room, row, col) => {
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbyOMzv1DnacgF6Mdl4_EXQqAc_SNmBStVLsn0dwVK47Nsmw4QI3e-rNDod6QEEFU_fQqA/exec';
+    let { newRow, newCol } = determineNewPosition(itemPosition, adjacentPosition); // Use the position of the adjacent item for determining the new position
 
-    const params = new URLSearchParams({
+    if (newRow === null || newCol === null) {
+      alert('Error determining new position.');
+      return;
+    }
+
+    // Check if the position is out of bounds and trigger row/column addition if needed
+    const isRowOutOfBounds = newRow > itemPosition.row + 1;
+    const isColOutOfBounds = newCol > itemPosition.col.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+
+    if (isRowOutOfBounds || isColOutOfBounds) {
+      console.log('Position is out of bounds. Adding necessary row/column.');
+      const params = new URLSearchParams({
         action: 'addRowOrColumn',
-        roomName: room,
-        row: row.toString(),
-        col: col
-    });
+        roomName: selectedRoom,
+        row: isRowOutOfBounds ? newRow + 1 : itemPosition.row,
+        col: isColOutOfBounds ? convertToColumnLabel(newCol) : convertToColumnLabel(itemPosition.col.charCodeAt(0) - 'A'.charCodeAt(0))
+      });
 
-    try {
+      try {
         const response = await fetch(`${scriptUrl}?${params}`, {
-            method: 'POST',
+          method: 'POST',
         });
 
         const result = await response.text();
-        console.log(result);
-    } catch (error) {
-        console.error('Error ensuring grid space:', error);
-    }
-};
+        console.log('Ensured grid space:', result);
 
-const convertToColumnLabel = (colIndex) => {
-  let columnLabel = '';
-  while (colIndex >= 0) {
+      } catch (error) {
+        console.error('Error ensuring grid space:', error);
+        alert('Error ensuring grid space.');
+        return;
+      }
+    }
+
+    // Proceed to place the item
+    const placeItemParams = new URLSearchParams({
+      action: 'placeItem',
+      roomName: selectedRoom,
+      row: newRow,
+      col: convertToColumnLabel(newCol),
+      itemId: itemId
+    });
+
+    try {
+      const placeResponse = await fetch(`${scriptUrl}?${placeItemParams}`, {
+        method: 'POST',
+      });
+
+      const placeResult = await placeResponse.text();
+      console.log('Item placed:', placeResult);
+      alert(`Item ${itemId} placed ${adjacentPosition} of ${adjacentItem} in room ${selectedRoom}`);
+
+      // Reload the page after a successful submission
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error placing item:', error);
+      alert('Error placing item.');
+    }
+  };
+
+  const determineNewPosition = (itemPosition, position) => {
+    let newRow = itemPosition.row;
+    let newCol = itemPosition.col.charCodeAt(0) - 'A'.charCodeAt(0);
+
+    switch (position) {
+      case 'Left':
+        newCol -= 1;
+        break;
+      case 'Right':
+        newCol += 1;
+        break;
+      case 'In Front':
+        newRow -= 1;
+        break;
+      case 'Behind':
+        newRow += 1;
+        break;
+      default:
+        console.error("Invalid position: " + position);
+        return { newRow: null, newCol: null };
+    }
+
+    return { newRow, newCol };
+  };
+
+  const convertToColumnLabel = (colIndex) => {
+    let columnLabel = '';
+    while (colIndex >= 0) {
       columnLabel = String.fromCharCode((colIndex % 26) + 65) + columnLabel;
       colIndex = Math.floor(colIndex / 26) - 1;
-  }
-  return columnLabel;
-};
-
-const handleSubmit = async () => {
-  if (!selectedRoom || !itemId || !adjacentPosition || !gridData) return;
-
-  const positionResult = determineNewPosition(gridData, adjacentPosition);
-
-  if (!positionResult) {
-      alert('Error determining new position.');
-      return;
-  }
-
-  let { newRow, newCol } = positionResult;
-
-  console.log("Selected Room:", selectedRoom);
-  console.log("Item ID:", itemId);
-  console.log("New Row:", newRow);
-  console.log("New Column (Numeric):", newCol);
-
-  // Convert the numeric column index to a column letter (e.g., 0 -> A, 1 -> B)
-  const newColLabel = convertToColumnLabel(newCol);
-  console.log("New Column (Alphabetical):", newColLabel);
-
-  // Ensure the grid space exists
-  await ensureGridSpace(selectedRoom, newRow + 1, newColLabel);
-
-  // Prepare the data to send, using only the column and row for the item
-  const dataToSend = {
-      [newColLabel]: itemId  // This ensures only column C is updated, for example
+    }
+    return columnLabel;
   };
-  console.log("Data being sent:", JSON.stringify(dataToSend));
-
-  try {
-      // Fetch the current room sheet data
-      const fetchData = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=${selectedRoom}`);
-      const roomData = await fetchData.json();
-      console.log('Room Data:', roomData);
-
-      // Determine if the row already exists, and if so, update the existing row
-      const existingRow = roomData.find(row => row.A === (newRow + 1).toString());
-
-      if (existingRow) {
-          // If the row exists, PATCH the existing row with the new column data
-          const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv/ID/${existingRow.ID}?sheet=${selectedRoom}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(dataToSend),
-          });
-          const result = await response.json();
-          console.log('Item placed:', result);
-
-          if (result.error) {
-              console.error('Error placing item:', result.error);
-              alert(`Error placing item: ${result.error}`);
-          } else {
-              alert(`Item ${itemId} placed ${adjacentPosition} of ${adjacentItem} in room ${selectedRoom}`);
-          }
-      } else {
-          // If the row does not exist, insert the item directly
-          const newItemData = {
-            A: (newRow + 1).toString(),  // Only add the row number where needed
-            [newColLabel]: itemId        // Ensure this is the only data being added to column C
-        };
-        
-          const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=${selectedRoom}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(newItemData),
-          });
-          const result = await response.json();
-          console.log('Item placed:', result);
-
-          if (result.error) {
-              console.error('Error placing item:', result.error);
-              alert(`Error placing item: ${result.error}`);
-          } else {
-              alert(`Item ${itemId} placed ${adjacentPosition} of ${adjacentItem} in room ${selectedRoom}`);
-          }
-      }
-  } catch (error) {
-      console.error('Error placing item:', error);
-  }
-};
-
-
-
-
-
-
-  
 
   return (
     <Box textAlign="center" p={4}>
@@ -285,8 +294,18 @@ const handleSubmit = async () => {
           {gridData.map((row, rowIndex) => (
             <Box key={rowIndex} display="flex" justifyContent="center">
               {row.map((cell, cellIndex) => (
-                <Box key={cellIndex} border="1px solid black" p={4} minWidth="50px">
-                  {cell || ' '}
+                <Box 
+                  key={cellIndex} 
+                  border="1px solid black" 
+                  minWidth="50px" 
+                  width="50px" 
+                  height="50px" 
+                  display="flex" 
+                  alignItems="center" 
+                  justifyContent="center"
+                  backgroundColor={cell.color || 'transparent'}
+                >
+                  {cell.value || ' '}
                 </Box>
               ))}
             </Box>
@@ -300,7 +319,10 @@ const handleSubmit = async () => {
           <Select
             placeholder="Choose Position"
             value={adjacentPosition}
-            onChange={(e) => setAdjacentPosition(e.target.value)}
+            onChange={(e) => {
+              setAdjacentPosition(e.target.value);
+              handleSelectPosition(e.target.value); // Call the function to update the grid
+            }}
             mt={2}
           >
             <option value="Left">Left</option>
