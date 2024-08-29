@@ -69,12 +69,13 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
     try {
       const response = await fetch(`https://sheetdb.io/api/v1/26ca60uj6plvv?sheet=${room}`);
       const data = await response.json();
-
+      console.log('Fetched grid data for room:', room, data); // Add this line for debugging
       setGridData(prevGridData => ({ ...prevGridData, [room]: data }));
     } catch (error) {
       console.error(`Error fetching grid data for ${room}:`, error);
     }
   };
+  
 
   const handleRoomChange = (room) => {
     setCurrentRoom(room);
@@ -218,24 +219,25 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
   };
 
   const handleAddRoom = async () => {
+    // Add the room to the Legend sheet
+    await addRoomToLegend(newRoomName, newRoomOrientation);
+  
+    // Trigger Google Apps Script to create the sheet
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbysPx5EfhCtSN2vcxQ1YU0hNEyG38aya17HZB-RdsgRTGZp7tlsZc3p6kxjB3kAh_oufg/exec'; // Replace with your Google Apps Script URL
+    const params = new URLSearchParams({
+      action: 'createRoom',  // Specify the action
+      roomName: newRoomName,
+    });
+  
     try {
-      const response = await fetch(process.env.REACT_APP_GOOGLE_SCRIPT_URL, {
+      const response = await fetch(`${scriptUrl}?${params}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roomName: newRoomName,
-        }),
       });
   
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-  
-      const result = await response.json();
+      const result = await response.text();
       console.log(result);
   
+      // Fetch the updated rooms list
       fetchRoomsFromLegend();
       onClose();
     } catch (error) {
@@ -243,7 +245,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
     }
   };
   
-
+  
   return (
     <Box textAlign="center">
       <Heading>Grid Map</Heading>
