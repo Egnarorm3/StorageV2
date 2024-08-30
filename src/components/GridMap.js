@@ -128,7 +128,6 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
       </Flex>
     ));
   };
-  
 
   const handleSmartSearch = async () => {
     const filteredInventory = items.filter(item => {
@@ -296,9 +295,32 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
       </Modal>
 
       <Box mb={4}>
+        <Button onClick={() => setSmartSearchMode(!smartSearchMode)} mb={2}>
+          {smartSearchMode ? 'Switch to Normal Search' : 'Switch to Smart Search'}
+        </Button>
+        {smartSearchMode ? (
+          <Box>
+            <Input
+              placeholder="Smart Search in grid"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Button onClick={handleSmartSearch} ml={2}>Search</Button>
+          </Box>
+        ) : (
+          <Input
+            placeholder="Search in grid"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        )}
+      </Box>
+
+      <Box mb={4}>
         <Button onClick={handleZoomIn} mr={2}>Zoom In</Button>
         <Button onClick={handleZoomOut}>Zoom Out</Button>
       </Box>
+      
       <Box overflowX="auto" width="100%">
         <VStack>
           {rooms.includes(currentRoom) && renderGrid(gridData[currentRoom] || [])}

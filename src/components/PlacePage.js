@@ -146,7 +146,7 @@ export default function PlacePage() {
       newGrid[targetRow][targetCol] = { value: itemId, color: 'yellow' }; // Place item and mark as valid
     }
 
-    // Don't update state before submitting to avoid the brief removal of the item
+    setGridData(newGrid); // Update the gridData state to reflect the new item placement
     console.log('Updated grid:', newGrid);
   };
 
@@ -242,6 +242,7 @@ export default function PlacePage() {
         console.error("Invalid position: " + position);
         return { newRow: null, newCol: null };
     }
+    newRow += 1;
 
     return { newRow, newCol };
   };
