@@ -121,6 +121,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
             textOverflow="ellipsis"
             width={`${100 * zoom}px`}
             height={`${100 * zoom}px`} // Ensure cells are squares
+            fontSize={`${20 * zoom}px`} // Dynamically change font size
           >
             {value}
           </Box>
@@ -128,6 +129,7 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
       </Flex>
     ));
   };
+  
 
   const handleSmartSearch = async () => {
     const filteredInventory = items.filter(item => {
@@ -321,11 +323,19 @@ export default function GridMap({ items, onAssignItem, onSubmit }) {
         <Button onClick={handleZoomOut}>Zoom Out</Button>
       </Box>
       
-      <Box overflowX="auto" width="100%">
-        <VStack>
-          {rooms.includes(currentRoom) && renderGrid(gridData[currentRoom] || [])}
-        </VStack>
-      </Box>
+      <Box
+  overflowX="scroll" // Allow scrolling horizontally in both directions
+  overflowY="scroll" // Allow vertical scrolling if needed
+  width="100%" // Ensure the width is 100% of the container
+  minWidth="100vw" // Make sure the container can grow to fit the grid
+  position="relative" // Ensure proper positioning for scroll behavior
+>
+  <VStack>
+    {rooms.includes(currentRoom) && renderGrid(gridData[currentRoom] || [])}
+  </VStack>
+</Box>
+
+
       {popupResults && (
         <Box
           position="fixed"
