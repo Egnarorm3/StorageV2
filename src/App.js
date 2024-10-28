@@ -96,7 +96,6 @@ export default function App() {
         <Flex as="nav" bg="teal.500" p={4} color="white" justifyContent="center">
           <List display="flex" styleType="none">
             <ListItem mx={2}><Link to="/">Home</Link></ListItem>
-            <ListItem mx={2}><Link to="/add">Add</Link></ListItem>
             <ListItem mx={2}><Link to="/move">Move</Link></ListItem>
             <ListItem mx={2}><Link to="/view">View</Link></ListItem>
             <ListItem mx={2}><Link to="/grid">Grid Map</Link></ListItem>
@@ -126,7 +125,6 @@ function Home() {
       <Heading>Home Page</Heading>
       <p>Welcome! Choose an option:</p>
       <List styleType="none" mt={4}>
-        <ListItem><Button as={Link} to="/add" colorScheme="teal" mt={2}>Add</Button></ListItem>
         <ListItem><Button as={Link} to="/move" colorScheme="teal" mt={2}>Move</Button></ListItem>
         <ListItem><Button as={Link} to="/view" colorScheme="teal" mt={2}>View</Button></ListItem>
         <ListItem><Button as={Link} to="/grid" colorScheme="teal" mt={2}>Grid Map</Button></ListItem>
