@@ -1,6 +1,6 @@
 // src/components/AddPage.js
 import React, { useState, useEffect } from 'react';
-import { Select, Box, Text } from '@chakra-ui/react';
+import { Select, Box, Text, Flex } from '@chakra-ui/react';
 import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
@@ -91,80 +91,85 @@ export default function AddPage() {
   return (
     <Box textAlign="center">
       <Text fontSize="2xl">Hello, {selectedUser}</Text>
-      <Box mt={8}>
-        <Text fontSize="lg">All Suwar Data</Text>
-        {userChartData ? (
-          <Pie
-            data={userChartData}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: {
-                  display: false,
-                },
-                tooltip: {
-                  enabled: false,
-                },
-                datalabels: {
-                  color: 'black',
-                  font: {
-                    size: 10,
-                    weight: 'bold',
+      <Flex justify="center" mt={8} gap={4}>
+        <Box width="350px" height="350px">
+          <Text fontSize="lg" mb={2}>All Suwar Data</Text>
+          {userChartData ? (
+            <Pie
+              data={userChartData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: false,
                   },
-                  anchor: 'end',
-                  align: 'start',
-                  clamp: true,
-                  rotation: (context) => {
-                    const { dataIndex, dataset } = context;
-                    const totalSlices = dataset.data.length;
-                    return ((dataIndex / totalSlices) * 360) + 90;  // Adding 90 degrees to the rotation
+                  tooltip: {
+                    enabled: false,
                   },
-                  formatter: (value, context) => context.chart.data.labels[context.dataIndex],
-                },
-              },
-            }}
-          />
-        ) : (
-          <Text>Loading data...</Text>
-        )}
-      </Box>
-      <Box mt={8}>
-        <Text fontSize="lg">Filtered Suwar Data (Excluding 0)</Text>
-        {filteredChartData ? (
-          <Pie
-            data={filteredChartData}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: {
-                  display: false,
-                },
-                tooltip: {
-                  enabled: false,
-                },
-                datalabels: {
-                  color: 'black',
-                  font: {
-                    size: 10,
-                    weight: 'bold',
+                  datalabels: {
+                    color: 'black',
+                    font: {
+                      size: 10,
+                      weight: 'bold',
+                    },
+                    anchor: 'end',
+                    align: 'start',
+                    clamp: true,
+                    rotation: (context) => {
+                      const { dataIndex, dataset } = context;
+                      const totalSlices = dataset.data.length;
+                      return ((dataIndex / totalSlices) * 360) + 90;
+                    },
+                    formatter: (value, context) => context.chart.data.labels[context.dataIndex],
                   },
-                  anchor: 'end',
-                  align: 'start',
-                  clamp: true,
-                  rotation: (context) => {
-                    const { dataIndex, dataset } = context;
-                    const totalSlices = dataset.data.length;
-                    return ((dataIndex / totalSlices) * 360) + 90;  // Adding 90 degrees to the rotation
-                  },
-                  formatter: (value, context) => context.chart.data.labels[context.dataIndex],
                 },
-              },
-            }}
-          />
-        ) : (
-          <Text>Loading data...</Text>
-        )}
-      </Box>
+              }}
+            />
+          ) : (
+            <Text>Loading data...</Text>
+          )}
+        </Box>
+
+        <Box width="350px" height="350px">
+          <Text fontSize="lg" mb={2}>Filtered Suwar Data (Excluding 0)</Text>
+          {filteredChartData ? (
+            <Pie
+              data={filteredChartData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: false,
+                  },
+                  tooltip: {
+                    enabled: false,
+                  },
+                  datalabels: {
+                    color: 'black',
+                    font: {
+                      size: 10,
+                      weight: 'bold',
+                    },
+                    anchor: 'end',
+                    align: 'start',
+                    clamp: true,
+                    rotation: (context) => {
+                      const { dataIndex, dataset } = context;
+                      const totalSlices = dataset.data.length;
+                      return ((dataIndex / totalSlices) * 360) + 90;
+                    },
+                    formatter: (value, context) => context.chart.data.labels[context.dataIndex],
+                  },
+                },
+              }}
+            />
+          ) : (
+            <Text>Loading data...</Text>
+          )}
+        </Box>
+      </Flex>
     </Box>
   );
 }
