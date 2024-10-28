@@ -1,4 +1,3 @@
-// src/components/AddPage.js
 import React, { useState, useEffect } from 'react';
 import { Select, Box, Text, Flex } from '@chakra-ui/react';
 import { Pie } from 'react-chartjs-2';
@@ -14,6 +13,7 @@ export default function AddPage() {
   const [filteredChartData, setFilteredChartData] = useState(null);
 
   useEffect(() => {
+    // Fetch user list only once on component mount
     const fetchUsers = async () => {
       try {
         const response = await fetch("https://sheetdb.io/api/v1/ubvot5aspyupb?sheet=Users");
@@ -28,30 +28,28 @@ export default function AddPage() {
 
   useEffect(() => {
     if (selectedUser) {
-      fetchUserData();
+      fetchUserData(selectedUser);
     }
   }, [selectedUser]);
 
-  const fetchUserData = async () => {
+  const fetchUserData = async (user) => {
     try {
       const response = await fetch("https://sheetdb.io/api/v1/ubvot5aspyupb?sheet=Data");
       const data = await response.json();
 
-      if (!data.length || !data[0].Suwar || !(selectedUser in data[0])) {
+      if (!data.length || !data[0].Suwar || !(user in data[0])) {
         console.error("Data format error: 'Suwar' or user column not found");
         return;
       }
 
       const userData = data.map(row => ({
         suwar: row.Suwar,
-        value: parseInt(row[selectedUser], 10),
+        value: parseInt(row[user], 10),
       }));
 
-      const chartData = prepareChartData(userData, false);
-      setUserChartData(chartData);
-
-      const filteredData = prepareChartData(userData, true);
-      setFilteredChartData(filteredData);
+      // Set chart data only if userData is valid and non-empty
+      setUserChartData(prepareChartData(userData, false));
+      setFilteredChartData(prepareChartData(userData, true));
     } catch (error) {
       console.error("Error fetching user data:", error);
     }

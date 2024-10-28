@@ -10,7 +10,8 @@ git pull origin main
 npm install
 
 # Build the React app
-NODE_OPTIONS="--max-old-space-size=4096" npm run build #it used to not have the stuff before npm run build
+npm run build
+#NODE_OPTIONS="--max-old-space-size=4096" 
 
 # Restart the app with PM2
 pm2 restart react-app
